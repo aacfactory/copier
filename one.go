@@ -13,6 +13,11 @@ const (
 func copyOne(dst reflect.Value, src reflect.Value) (err error) {
 	dst = reflect.Indirect(dst)
 	src = reflect.Indirect(src)
+	if src.CanConvert(dst.Type()) {
+		dst.Set(src.Convert(dst.Type()))
+		return
+	}
+
 	fieldNum := dst.NumField()
 	for i := 0; i < fieldNum; i++ {
 		dstFieldValue := dst.Field(i)
@@ -32,11 +37,14 @@ func copyOne(dst reflect.Value, src reflect.Value) (err error) {
 		if !found {
 			continue
 		}
-		// json
-		copyValueErr := copyValue(dstFieldValue, srcFieldValue)
+
+		dstFieldValue0, copyValueErr := copyValue(dstFieldValue, srcFieldValue)
 		if copyValueErr != nil {
 			err = fmt.Errorf("%s of %s.%s %v", dstFieldType.Name, dst.Type().PkgPath(), dst.Type().Name(), copyValueErr)
 			return
+		}
+		if dstFieldValue0.IsValid() {
+			dstFieldValue.Set(dstFieldValue0)
 		}
 	}
 	return

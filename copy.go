@@ -34,7 +34,7 @@ func Copy(dst interface{}, src interface{}) (err error) {
 	case reflect.Struct:
 		err = copyOne(dstValue, srcValue)
 	case reflect.Array, reflect.Slice:
-		err = copyArray(dstValue, srcValue)
+		dstValue, err = copyArray(dstValue, srcValue)
 	case reflect.Map:
 		err = copyMap(dstValue, srcValue)
 	default:
@@ -45,5 +45,6 @@ func Copy(dst interface{}, src interface{}) (err error) {
 		err = fmt.Errorf("copy failed for %v", err)
 		return
 	}
+
 	return
 }
