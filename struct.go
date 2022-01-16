@@ -10,7 +10,7 @@ const (
 	tagName = "copy"
 )
 
-func copyOne(dst reflect.Value, src reflect.Value) (err error) {
+func copyStruct(dst reflect.Value, src reflect.Value) (err error) {
 	dst = reflect.Indirect(dst)
 	src = reflect.Indirect(src)
 	if src.CanConvert(dst.Type()) {
@@ -37,7 +37,6 @@ func copyOne(dst reflect.Value, src reflect.Value) (err error) {
 		if !found {
 			continue
 		}
-
 		dstFieldValue0, copyValueErr := copyValue(dstFieldValue, srcFieldValue)
 		if copyValueErr != nil {
 			err = fmt.Errorf("%s of %s.%s %v", dstFieldType.Name, dst.Type().PkgPath(), dst.Type().Name(), copyValueErr)

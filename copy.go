@@ -32,11 +32,11 @@ func Copy(dst interface{}, src interface{}) (err error) {
 	}
 	switch dstType.Kind() {
 	case reflect.Struct:
-		err = copyOne(dstValue, srcValue)
+		err = copyStruct(dstValue, srcValue)
 	case reflect.Array, reflect.Slice:
 		dstValue, err = copyArray(dstValue, srcValue)
 	case reflect.Map:
-		err = copyMap(dstValue, srcValue)
+		dstValue, err = copyMap(dstValue, srcValue)
 	default:
 		err = fmt.Errorf("copy failed for %v is not supported", dstType.Kind())
 		return
@@ -45,6 +45,5 @@ func Copy(dst interface{}, src interface{}) (err error) {
 		err = fmt.Errorf("copy failed for %v", err)
 		return
 	}
-
 	return
 }

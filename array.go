@@ -49,7 +49,7 @@ func copyArray(dst reflect.Value, src reflect.Value) (v reflect.Value, err error
 			dst = reflect.Append(dst, dstItem)
 		} else if dstElemTypeKind == reflect.Struct {
 			dstItem := reflect.New(dstElemType)
-			err = copyOne(dstItem, srcItem)
+			err = copyStruct(dstItem, srcItem)
 			if err != nil {
 				return
 			}

@@ -1,10 +1,10 @@
 package copier_test
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/copier"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -12,27 +12,31 @@ import (
 type Date time.Time
 
 type Foo struct {
-	Str   string
-	Time  Date `copy:"Time"`
-	I     int  `copy:"i"`
-	Bytes json.RawMessage
-	Baz   Baz
-	Bazs  []Faz
-	IS    []int
-	ISS   [][]int
-	MM    map[string]*Faz
+	Str       string
+	Time      Date `copy:"Time"`
+	I         int  `copy:"i"`
+	Bytes     json.RawMessage
+	Baz       Baz
+	Bazs      []Faz
+	IS        []int
+	ISS       [][]int
+	MM        map[string]*Faz
+	SQLTime   time.Time
+	SQLString string
 }
 
 type Bar struct {
-	Str   string
-	Now   time.Time `copy:"Time"`
-	X     int64     `copy:"i"`
-	Bytes []byte
-	Baz   Baz
-	Bazs  []*Baz
-	IS    []int
-	ISS   [][]int
-	MM    map[string]*Baz
+	Str       string
+	Now       time.Time `copy:"Time"`
+	X         int64     `copy:"i"`
+	Bytes     []byte
+	Baz       Baz
+	Bazs      []*Baz
+	IS        []int
+	ISS       [][]int
+	MM        map[string]*Baz
+	SQLTime   sql.NullTime
+	SQLString sql.NullString
 }
 
 type Baz struct {
@@ -56,9 +60,16 @@ func TestCopy(t *testing.T) {
 		Bazs: []*Baz{{X: "1"}},
 		IS:   []int{1, 2},
 		ISS:  [][]int{{1, 2}, {3, 4}},
+		MM: map[string]*Baz{
+			"a": {X: "a"},
+			"b": {X: "b"},
+			"c": {X: "c"},
+		},
+		SQLTime:   sql.NullTime{Time: time.Now()},
+		SQLString: sql.NullString{String: "x"},
 	}
 	err := copier.Copy(foo, bar)
 	fmt.Println(err)
-	fmt.Println(foo)
-	fmt.Println(reflect.Value{}.IsValid())
+	fmt.Println(fmt.Sprintf("%+v", foo))
+
 }
