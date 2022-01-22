@@ -19,7 +19,7 @@ func Copy(dst interface{}, src interface{}) (err error) {
 		return
 	}
 	dstType = dstType.Elem()
-	dstValue := reflect.Indirect(reflect.ValueOf(dst))
+	dstValue := reflect.ValueOf(dst)
 	srcValue := reflect.ValueOf(src)
 	srcType := reflect.TypeOf(src)
 	if srcType.Kind() == reflect.Ptr {
@@ -32,11 +32,26 @@ func Copy(dst interface{}, src interface{}) (err error) {
 	}
 	switch dstType.Kind() {
 	case reflect.Struct:
-		err = copyStruct(dstValue, srcValue)
+		cpValue, cpErr := copyStruct(dstValue.Elem(), srcValue)
+		if cpErr != nil {
+			err = fmt.Errorf("copy failed for %v", cpErr)
+			return
+		}
+		dstValue.Elem().Set(cpValue)
 	case reflect.Array, reflect.Slice:
-		dstValue, err = copyArray(dstValue, srcValue)
+		cpValue, cpErr := copyArray(dstValue.Elem(), srcValue)
+		if cpErr != nil {
+			err = fmt.Errorf("copy failed for %v", cpErr)
+			return
+		}
+		dstValue.Elem().Set(cpValue)
 	case reflect.Map:
-		dstValue, err = copyMap(dstValue, srcValue)
+		cpValue, cpErr := copyMap(dstValue.Elem(), srcValue)
+		if cpErr != nil {
+			err = fmt.Errorf("copy failed for %v", cpErr)
+			return
+		}
+		dstValue.Elem().Set(cpValue)
 	default:
 		err = fmt.Errorf("copy failed for %v is not supported", dstType.Kind())
 		return

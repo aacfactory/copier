@@ -6,10 +6,7 @@ import (
 )
 
 func copyArray(dst reflect.Value, src reflect.Value) (v reflect.Value, err error) {
-	if !dst.CanSet() {
-		return
-	}
-	if src.IsNil() {
+	if src.IsNil() || src.Len() == 0 {
 		return
 	}
 
@@ -21,7 +18,8 @@ func copyArray(dst reflect.Value, src reflect.Value) (v reflect.Value, err error
 	// bytes
 	if dstElemTypeKind == reflect.Uint8 {
 		if srcElemTypeKind == reflect.Uint8 {
-			dst.SetBytes(src.Bytes())
+			dst = src.Convert(dst.Type())
+			v = dst
 			return
 		} else {
 			err = fmt.Errorf("type was not matched")
@@ -39,34 +37,33 @@ func copyArray(dst reflect.Value, src reflect.Value) (v reflect.Value, err error
 		srcItem := src.Index(i)
 		if dstElemTypeKind == reflect.Ptr {
 			dstItem := reflect.New(dstElemType.Elem())
-			dstItem, err = copyValue(dstItem, srcItem)
-			if err != nil {
+			vv, cpErr := copyStruct(dstItem.Elem(), srcItem.Elem())
+			if cpErr != nil {
+				err = cpErr
 				return
 			}
-			if !dstItem.IsValid() {
-				continue
-			}
+			dstItem.Elem().Set(vv)
 			dst = reflect.Append(dst, dstItem)
 		} else if dstElemTypeKind == reflect.Struct {
-			dstItem := reflect.New(dstElemType)
-			err = copyStruct(dstItem, srcItem)
-			if err != nil {
+			dstItem := reflect.New(dstElemType).Elem()
+			vv, cpErr := copyStruct(dstItem, srcItem)
+			if cpErr != nil {
+				err = cpErr
 				return
 			}
-			if !dstItem.IsValid() {
-				continue
-			}
-			dst = reflect.Append(dst, dstItem.Elem())
+			dstItem.Set(vv)
+			dst = reflect.Append(dst, dstItem)
 		} else if dstElemTypeKind == reflect.Slice {
 			dstItem := reflect.MakeSlice(dstElemType, 0, 1)
-			dstItem, err = copyArray(dstItem, srcItem)
-			if err != nil {
+			vv, cpErr := copyArray(dstItem, srcItem)
+			if cpErr != nil {
+				err = cpErr
 				return
 			}
 			if !dstItem.IsValid() {
 				continue
 			}
-			dst = reflect.Append(dst, dstItem)
+			dst = reflect.Append(dst, vv)
 		}
 
 	}
