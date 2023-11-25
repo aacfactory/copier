@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-func Copy(dst interface{}, src interface{}) (err error) {
+func Copy(dst any, src any) (err error) {
 	if dst == nil {
 		err = fmt.Errorf("copy failed for dst is nil")
 		return
@@ -60,5 +60,10 @@ func Copy(dst interface{}, src interface{}) (err error) {
 		err = fmt.Errorf("copy failed for %v", err)
 		return
 	}
+	return
+}
+
+func ValueOf[D any](src any) (dst D, err error) {
+	err = Copy(&dst, src)
 	return
 }

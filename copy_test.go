@@ -104,3 +104,31 @@ func TestMap(t *testing.T) {
 	fmt.Println(dst)
 	fmt.Println(dst["a"])
 }
+
+func TestValueOf(t *testing.T) {
+	bar := Bar{
+		Str:   "str",
+		Now:   time.Now(),
+		X:     100,
+		Bytes: []byte(`{"a":1}`),
+		Baz:   Baz{X: "0"},
+		Bazz:  &Baz{X: "1"},
+		Bazs:  []Baz{{X: "1"}},
+		Bazzs: []*Baz{{X: "1"}},
+		IS:    []int{1, 2},
+		ISS:   [][]int{{1, 2}, {3, 4}},
+		MM: map[string]*Baz{
+			"a": {X: "a"},
+			"b": {X: "b"},
+			"c": {X: "c"},
+		},
+		SQLTime:   sql.NullTime{Time: time.Now()},
+		SQLString: sql.NullString{String: "x"},
+	}
+	dst, err := copier.ValueOf[Foo](bar)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(fmt.Sprintf("%+v", dst))
+}

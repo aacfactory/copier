@@ -20,9 +20,9 @@ type Date time.Time
 
 type Foo struct {
 	Str         string
-    Int         int
-    Bool        bool
-    Float       float64
+	Int         int
+	Bool        bool
+	Float       float64
 	Date        Date                `copy:"Time"`
 	Bytes       json.RawMessage
 	Faz         *Faz                `copy:"Faz"`
@@ -32,7 +32,7 @@ type Foo struct {
 	FazMap      map[string]*Faz     `copy:"FazMap"`
 	SQLTime     time.Time
 	SQLString   string
-    Ignore      interface{}         `copy:"-"`
+	Ignore      interface{}         `copy:"-"`
 }
 
 type Faz struct {
@@ -43,9 +43,9 @@ source
 ```go
 type Bar struct {
 	Str         string
-    Int         int
-    Bool        bool
-    Float       float64
+	Int         int
+	Bool        bool
+	Float       float64
 	Time        Date                `copy:"Time"`
 	Bytes       json.RawMessage
 	Baz         *Baz                `copy:"Faz"`
@@ -55,7 +55,7 @@ type Bar struct {
 	BazMap      map[string]*Baz     `copy:"FazMap"`
 	SQLTime     time.Time
 	SQLString   string
-    Ignore      interface{}         `copy:"-"`
+	Ignore      interface{}         `copy:"-"`
 }
 
 type Baz struct {
@@ -66,5 +66,8 @@ copy
 ```go
 foo := &Foo{}
 bar := Bar{...}
+// use copy
 err := copier.Copy(foo, bar)
+// use value of
+foo, err = copier.ValueOf[Foo](bar)
 ```
