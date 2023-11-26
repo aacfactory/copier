@@ -11,24 +11,51 @@ const (
 )
 
 func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err error) {
-	if src.Type().Kind() != reflect.Struct {
+	dstType := dst.Type()
+	srcType := src.Type()
+	if srcType.Kind() != reflect.Struct {
 		err = fmt.Errorf("type is dismatched")
 		return
 	}
 
-	if src.CanConvert(dst.Type()) {
-		dst.Set(src.Convert(dst.Type()))
+	if srcType == dstType {
+		dst.Set(src)
 		v = dst
 		return
 	}
 
-	if src.Type() == sqlNullTimeType {
-		src = src.FieldByName("Time")
-		if src.CanConvert(dst.Type()) {
-			dst.Set(src.Convert(dst.Type()))
-			v = dst
-		} else {
-			err = fmt.Errorf("type is dismatched")
+	if src.CanConvert(dstType) {
+		dst.Set(src.Convert(dstType))
+		v = dst
+		return
+	}
+
+	if srcType.Implements(sqlScannerType) || reflect.New(srcType).Type().Implements(sqlScannerType) {
+		var srcValue reflect.Value
+		valid := false
+		srcFields := src.NumField()
+		for i := 0; i < srcFields; i++ {
+			srcFieldType := srcType.Field(i)
+			if srcFieldType.Anonymous {
+				continue
+			}
+			if srcFieldType.Name == "Valid" {
+				valid = src.Field(i).Bool()
+				continue
+			}
+			srcValue = src.Field(i)
+		}
+		if valid {
+			if srcValue.Type() == dstType {
+				dst.Set(srcValue)
+				v = dst
+				return
+			}
+			if src.CanConvert(dstType) {
+				dst.Set(src.Convert(dstType))
+				v = dst
+				return
+			}
 		}
 		return
 	}
@@ -36,7 +63,17 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 	fieldNum := dst.NumField()
 	for i := 0; i < fieldNum; i++ {
 		dstFieldValue := dst.Field(i)
-		dstFieldType := dst.Type().Field(i)
+		dstFieldType := dstType.Field(i)
+		// Anonymous
+		if dstFieldType.Anonymous {
+			vv, cpErr := copyStruct(dstFieldValue, src)
+			if cpErr != nil {
+				err = cpErr
+				return
+			}
+			dstFieldValue.Set(vv)
+			continue
+		}
 		tag, hasTag := dstFieldType.Tag.Lookup(tagName)
 		var srcFieldValue reflect.Value
 		found := false
@@ -52,12 +89,15 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 		if !found {
 			continue
 		}
+
 		srcFieldType := srcFieldValue.Type()
 		srcFieldTypeKind := srcFieldType.Kind()
 		switch dstFieldType.Type.Kind() {
 		case reflect.String:
 			if srcFieldType == sqlNullStringType {
-				dstFieldValue.SetString(srcFieldValue.FieldByName("String").String())
+				if srcFieldValue.FieldByName("Valid").Bool() {
+					dstFieldValue.SetString(srcFieldValue.FieldByName("String").String())
+				}
 				continue
 			}
 			if srcFieldTypeKind != reflect.String {
@@ -69,7 +109,9 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 			}
 		case reflect.Bool:
 			if srcFieldType == sqlNullBoolType {
-				dstFieldValue.SetBool(src.FieldByName("Bool").Bool())
+				if srcFieldValue.FieldByName("Valid").Bool() {
+					dstFieldValue.SetBool(src.FieldByName("Bool").Bool())
+				}
 				continue
 			}
 			if srcFieldTypeKind != reflect.Bool {
@@ -81,15 +123,21 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			if srcFieldType == sqlNullInt16Type {
-				dstFieldValue.SetInt(srcFieldValue.FieldByName("Int16").Int())
+				if srcFieldValue.FieldByName("Valid").Bool() {
+					dstFieldValue.SetInt(srcFieldValue.FieldByName("Int16").Int())
+				}
 				continue
 			}
 			if srcFieldType == sqlNullInt32Type {
-				dstFieldValue.SetInt(srcFieldValue.FieldByName("Int32").Int())
+				if srcFieldValue.FieldByName("Valid").Bool() {
+					dstFieldValue.SetInt(srcFieldValue.FieldByName("Int32").Int())
+				}
 				continue
 			}
 			if srcFieldType == sqlNullInt64Type {
-				dstFieldValue.SetInt(srcFieldValue.FieldByName("Int64").Int())
+				if srcFieldValue.FieldByName("Valid").Bool() {
+					dstFieldValue.SetInt(srcFieldValue.FieldByName("Int64").Int())
+				}
 				continue
 			}
 			if srcFieldTypeKind != reflect.Int && srcFieldTypeKind != reflect.Int8 && srcFieldTypeKind != reflect.Int16 && srcFieldTypeKind != reflect.Int32 && srcFieldTypeKind != reflect.Int64 {
@@ -109,7 +157,9 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 			}
 		case reflect.Float32, reflect.Float64:
 			if srcFieldType == sqlNullFloat64Type {
-				dstFieldValue.SetFloat(srcFieldValue.FieldByName("Float64").Float())
+				if srcFieldValue.FieldByName("Valid").Bool() {
+					dstFieldValue.SetFloat(srcFieldValue.FieldByName("Float64").Float())
+				}
 				continue
 			}
 			if srcFieldTypeKind != reflect.Float32 && srcFieldTypeKind != reflect.Float64 {
@@ -138,7 +188,6 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 				return
 			}
 			dstFieldValue.Set(vv)
-
 		case reflect.Ptr:
 			if srcFieldTypeKind != reflect.Ptr {
 				err = fmt.Errorf("type is dismatched")
@@ -210,6 +259,18 @@ func findFieldValueByTag(tag string, src reflect.Value) (v reflect.Value, has bo
 func findFieldValueByName(name string, src reflect.Value) (v reflect.Value, has bool) {
 	if _, has = src.Type().FieldByName(name); has {
 		v = src.FieldByName(name)
+		return
+	}
+	srcType := src.Type()
+	fields := srcType.NumField()
+	for i := 0; i < fields; i++ {
+		srcFieldType := srcType.Field(i)
+		if srcFieldType.Anonymous {
+			v, has = findFieldValueByName(name, src.Field(i))
+			if has {
+				return
+			}
+		}
 	}
 	return
 }

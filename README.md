@@ -2,11 +2,11 @@
 copy source value into destination value.
 
 # Feature
-* Sample Type
-* Tag Match
-* Copy sql.NullX into Value Type
-* Support Slice
-* Support Map
+* Support tag
+* Support sql.Scanner
+* Support anonymous
+* Support slice
+* Support map
 
 # Install
 ```bash

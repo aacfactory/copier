@@ -5,13 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/copier"
+	"reflect"
 	"testing"
 	"time"
 )
 
 type Date time.Time
 
+type User struct {
+	Name string
+}
+
+type NullJson[E any] struct {
+	Value E
+	Valid bool
+}
+
+func (n NullJson[E]) Scan(src any) error {
+	return nil
+}
+
 type Foo struct {
+	User      User
 	Str       string
 	IS        []int
 	ISS       [][]int
@@ -28,6 +43,7 @@ type Foo struct {
 }
 
 type Bar struct {
+	User      NullJson[User]
 	Str       string
 	Now       time.Time `copy:"Time"`
 	X         int64     `copy:"i"`
@@ -107,6 +123,10 @@ func TestMap(t *testing.T) {
 
 func TestValueOf(t *testing.T) {
 	bar := Bar{
+		User: NullJson[User]{
+			Value: User{Name: "username"},
+			Valid: true,
+		},
 		Str:   "str",
 		Now:   time.Now(),
 		X:     100,
@@ -122,8 +142,8 @@ func TestValueOf(t *testing.T) {
 			"b": {X: "b"},
 			"c": {X: "c"},
 		},
-		SQLTime:   sql.NullTime{Time: time.Now()},
-		SQLString: sql.NullString{String: "x"},
+		SQLTime:   sql.NullTime{Time: time.Now(), Valid: true},
+		SQLString: sql.NullString{String: "x", Valid: false},
 	}
 	dst, err := copier.ValueOf[Foo](bar)
 	if err != nil {
@@ -131,4 +151,59 @@ func TestValueOf(t *testing.T) {
 		return
 	}
 	fmt.Println(fmt.Sprintf("%+v", dst))
+}
+
+type XUser struct {
+	NullJson[User]
+}
+
+func TestNullUser(t *testing.T) {
+	nu := XUser{}
+	rv := reflect.ValueOf(nu)
+	for i := 0; i < rv.NumField(); i++ {
+		fmt.Println(rv.Type().Field(i))
+	}
+}
+
+type Internal struct {
+	Id   string
+	Name string
+}
+
+type SI struct {
+	Internal
+	Bar string
+}
+
+type SS struct {
+	Id   string
+	Name string
+	Bar  string
+}
+
+func TestValueOf2(t *testing.T) {
+	si, siErr := copier.ValueOf[SI](SS{
+		Id:   "1",
+		Name: "1",
+		Bar:  "1",
+	})
+	if siErr != nil {
+		fmt.Println(siErr)
+		return
+	}
+	fmt.Println(fmt.Sprintf("%+v", si))
+
+	ss, ssErr := copier.ValueOf[SS](si)
+	if ssErr != nil {
+		fmt.Println(ssErr)
+		return
+	}
+	fmt.Println(fmt.Sprintf("%+v", ss))
+
+	si1, si1Err := copier.ValueOf[SI](si)
+	if si1Err != nil {
+		fmt.Println(si1Err)
+		return
+	}
+	fmt.Println(fmt.Sprintf("%+v", si1))
 }

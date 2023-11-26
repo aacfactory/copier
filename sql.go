@@ -13,4 +13,5 @@ var (
 	sqlNullFloat64Type = reflect.TypeOf(sql.NullFloat64{})
 	sqlNullBoolType    = reflect.TypeOf(sql.NullBool{})
 	sqlNullTimeType    = reflect.TypeOf(sql.NullTime{})
+	sqlScannerType     = reflect.TypeOf((*sql.Scanner)(nil)).Elem()
 )
