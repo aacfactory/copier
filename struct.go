@@ -66,12 +66,24 @@ func copyStruct(dst reflect.Value, src reflect.Value) (v reflect.Value, err erro
 		dstFieldType := dstType.Field(i)
 		// Anonymous
 		if dstFieldType.Anonymous {
-			vv, cpErr := copyStruct(dstFieldValue, src)
-			if cpErr != nil {
-				err = cpErr
-				return
+			if isPtr := dstFieldType.Type.Kind() == reflect.Ptr; isPtr {
+				dstFieldValue = reflect.New(dstFieldType.Type.Elem())
+				_, cpErr := copyStruct(dstFieldValue.Elem(), src)
+				if cpErr != nil {
+					err = cpErr
+					return
+				}
+				if dst.Field(i).CanSet() {
+					dst.Field(i).Set(dstFieldValue)
+				}
+			} else {
+				vv, cpErr := copyStruct(dstFieldValue, src)
+				if cpErr != nil {
+					err = cpErr
+					return
+				}
+				dstFieldValue.Set(vv)
 			}
-			dstFieldValue.Set(vv)
 			continue
 		}
 		tag, hasTag := dstFieldType.Tag.Lookup(tagName)
@@ -257,8 +269,12 @@ func findFieldValueByTag(tag string, src reflect.Value) (v reflect.Value, has bo
 }
 
 func findFieldValueByName(name string, src reflect.Value) (v reflect.Value, has bool) {
-	if _, has = src.Type().FieldByName(name); has {
+	if src.Type().Kind() == reflect.Ptr && src.IsNil() {
+		return
+	}
+	if _, hasField := src.Type().FieldByName(name); hasField {
 		v = src.FieldByName(name)
+		has = true
 		return
 	}
 	srcType := src.Type()
@@ -266,7 +282,11 @@ func findFieldValueByName(name string, src reflect.Value) (v reflect.Value, has 
 	for i := 0; i < fields; i++ {
 		srcFieldType := srcType.Field(i)
 		if srcFieldType.Anonymous {
-			v, has = findFieldValueByName(name, src.Field(i))
+			srcField := src.Field(i)
+			if srcFieldType.Type.Kind() == reflect.Ptr && srcField.IsNil() {
+				continue
+			}
+			v, has = findFieldValueByName(name, srcField)
 			if has {
 				return
 			}

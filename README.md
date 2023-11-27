@@ -1,19 +1,22 @@
 # Copier
 copy source value into destination value.
 
-# Feature
+## Feature
 * Support tag
 * Support sql.Scanner
 * Support anonymous
 * Support slice
 * Support map
 
-# Install
+## Note
+* DON'T SUPPORT UNEXPORTED EMBED PTR 
+
+## Install
 ```bash
 go get github.com/aacfactory/copier
 ```
 
-# Example
+## Example
 destination
 ```go
 type Date time.Time

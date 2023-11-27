@@ -168,10 +168,11 @@ func TestNullUser(t *testing.T) {
 type Internal struct {
 	Id   string
 	Name string
+	s    string
 }
 
 type SI struct {
-	Internal
+	*Internal
 	Bar string
 }
 
@@ -179,13 +180,15 @@ type SS struct {
 	Id   string
 	Name string
 	Bar  string
+	s    string
 }
 
 func TestValueOf2(t *testing.T) {
 	si, siErr := copier.ValueOf[SI](SS{
 		Id:   "1",
-		Name: "1",
-		Bar:  "1",
+		Name: "name",
+		Bar:  "bar",
+		s:    "s",
 	})
 	if siErr != nil {
 		fmt.Println(siErr)
