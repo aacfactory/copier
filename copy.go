@@ -2,6 +2,7 @@ package copier
 
 import (
 	"fmt"
+	"github.com/modern-go/reflect2"
 	"reflect"
 )
 
@@ -13,6 +14,51 @@ func Copy(dst any, src any) (err error) {
 	if src == nil {
 		return
 	}
+
+	dstType := reflect2.TypeOf(dst)
+	if dstType.Kind() != reflect.Ptr {
+		err = fmt.Errorf("copy failed for type of dst must be ptr")
+		return
+	}
+	// dst element type
+	dstType = dstType.(reflect2.PtrType).Elem()
+	// dst ptr
+	dstPtr := reflect2.PtrOf(dst)
+	// src type
+	srcType := reflect2.TypeOf(src)
+	if srcType.Kind() == reflect.Ptr {
+		srcType = srcType.(reflect2.PtrType).Elem()
+	}
+	// src ptr
+	srcPtr := reflect2.PtrOf(src)
+	// copy by type
+	switch dstType.Kind() {
+	case reflect.String:
+
+		break
+	case reflect.Bool:
+
+		break
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+
+		break
+	case reflect.Float32, reflect.Float64:
+
+		break
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+
+		break
+	case reflect.Struct:
+		break
+	case reflect.Slice:
+		break
+	case reflect.Map:
+		break
+	default:
+		err = fmt.Errorf("copy failed for %v is not supported", dstType.Kind())
+		return
+	}
+
 	dstType := reflect.TypeOf(dst)
 	if dstType.Kind() != reflect.Ptr {
 		err = fmt.Errorf("copy failed for type of dst must be ptr")
