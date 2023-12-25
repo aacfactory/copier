@@ -18,7 +18,7 @@ func DescribeNullString(typ reflect2.Type) (v SQLDescriptor, err error) {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.(reflect2.PtrType).Elem()
 	}
-	descriptor := DescribeStruct("", typ)
+	descriptor := DescribeStruct(typ)
 	var valueType reflect2.StructField
 	var validType reflect2.StructField
 	for _, field := range descriptor.Fields() {
@@ -70,7 +70,7 @@ func DescribeNullBool(typ reflect2.Type) (v SQLDescriptor, err error) {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.(reflect2.PtrType).Elem()
 	}
-	descriptor := DescribeStruct("", typ)
+	descriptor := DescribeStruct(typ)
 	var valueType reflect2.StructField
 	var validType reflect2.StructField
 	for _, field := range descriptor.Fields() {
@@ -122,7 +122,7 @@ func DescribeNullInt(typ reflect2.Type) (v SQLDescriptor, err error) {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.(reflect2.PtrType).Elem()
 	}
-	descriptor := DescribeStruct("", typ)
+	descriptor := DescribeStruct(typ)
 	var valueType reflect2.StructField
 	var validType reflect2.StructField
 	for _, field := range descriptor.Fields() {
@@ -182,7 +182,7 @@ func DescribeNullFloat(typ reflect2.Type) (v SQLDescriptor, err error) {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.(reflect2.PtrType).Elem()
 	}
-	descriptor := DescribeStruct("", typ)
+	descriptor := DescribeStruct(typ)
 	var valueType reflect2.StructField
 	var validType reflect2.StructField
 	for _, field := range descriptor.Fields() {
@@ -234,7 +234,7 @@ func DescribeNullByte(typ reflect2.Type) (v SQLDescriptor, err error) {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.(reflect2.PtrType).Elem()
 	}
-	descriptor := DescribeStruct("", typ)
+	descriptor := DescribeStruct(typ)
 	var valueType reflect2.StructField
 	var validType reflect2.StructField
 	for _, field := range descriptor.Fields() {
@@ -286,7 +286,7 @@ func DescribeNullTime(typ reflect2.Type) (v SQLDescriptor, err error) {
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.(reflect2.PtrType).Elem()
 	}
-	descriptor := DescribeStruct("", typ)
+	descriptor := DescribeStruct(typ)
 	var valueType reflect2.StructField
 	var validType reflect2.StructField
 	for _, field := range descriptor.Fields() {

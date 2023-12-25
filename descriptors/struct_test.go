@@ -18,7 +18,7 @@ type Bar struct {
 
 type Foo struct {
 	Anonymous
-	String  string
+	String  string `copier:"str"`
 	Boolean bool
 	Int     int
 	Long    int64
@@ -57,7 +57,7 @@ func TestStructFields_Get(t *testing.T) {
 		Map:     nil,
 	}
 	ptr := reflect2.PtrOf(&foo)
-	desc := descriptors.DescribeStruct("copier", reflect2.TypeOf(Foo{}))
+	desc := descriptors.DescribeStruct(reflect2.TypeOf(Foo{}))
 	for _, f := range desc.Fields() {
 		fp, fType, fErr := f.ValueOf(ptr)
 		if fErr != nil {
@@ -67,4 +67,6 @@ func TestStructFields_Get(t *testing.T) {
 		fv := fType.UnsafeIndirect(fp)
 		t.Log("name:", f.Name, "type:", fType, "value:", fv)
 	}
+	f := desc.FieldByTag("copier", "str")
+	t.Log(f)
 }

@@ -51,7 +51,18 @@ func (sf StructFields) Get(name string) *StructFieldDescriptor {
 	return nil
 }
 
-func DescribeStruct(tagKey string, typ reflect2.Type) *StructDescriptor {
+func (sf StructFields) GetByTag(tagKey string, name string) *StructFieldDescriptor {
+	for _, f := range sf {
+		for _, field := range f.Field {
+			if tag, has := field.Tag().Lookup(tagKey); has && tag == name {
+				return f
+			}
+		}
+	}
+	return nil
+}
+
+func DescribeStruct(typ reflect2.Type) *StructDescriptor {
 	structType := typ.(*reflect2.UnsafeStructType)
 	fields := StructFields{}
 
@@ -97,11 +108,6 @@ func DescribeStruct(tagKey string, typ reflect2.Type) *StructDescriptor {
 				}
 
 				fieldName := field.Name()
-				if tagKey != "" {
-					if tag, ok := field.Tag().Lookup(tagKey); ok {
-						fieldName = tag
-					}
-				}
 
 				fields = append(fields, &StructFieldDescriptor{
 					Name:  fieldName,
@@ -132,5 +138,10 @@ func (desc *StructDescriptor) Fields() StructFields {
 
 func (desc *StructDescriptor) Field(name string) (f *StructFieldDescriptor) {
 	f = desc.fields.Get(name)
+	return
+}
+
+func (desc *StructDescriptor) FieldByTag(tagKey string, name string) (f *StructFieldDescriptor) {
+	f = desc.fields.GetByTag(tagKey, name)
 	return
 }
