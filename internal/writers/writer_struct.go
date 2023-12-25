@@ -14,7 +14,8 @@ type StructWriter struct {
 	descriptor *commons.StructDescriptor
 }
 
-func (w *StructWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer) {
+func (w *StructWriter) Write(dstPtr unsafe.Pointer, reader Reader) (err error) {
+	srcType := reader.Type()
 
 	return
 }
