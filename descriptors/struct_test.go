@@ -69,4 +69,10 @@ func TestStructFields_Get(t *testing.T) {
 	}
 	f := desc.FieldByTag("copier", "str")
 	t.Log(f)
+	v := Foo{}
+	vp := reflect2.PtrOf(&v)
+	anoF := desc.Field("Anonymous")
+	_, anoFT, _ := anoF.ValueOf(vp)
+	anoFT.UnsafeSet(vp, reflect2.PtrOf("ano"))
+	t.Log(v.Anonymous.Anonymous)
 }
