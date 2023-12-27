@@ -62,7 +62,6 @@ func (w *SliceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTyp
 	for i := 0; i < srcLen; i++ {
 		sept := sst.UnsafeGetIndex(srcPtr, i)
 		dset := w.elemType.UnsafeNew()
-		fmt.Println("slice:", dset, w.elemType.String(), w.elemType.UnsafeIsNil(dstPtr))
 		elemWErr := w.elemWriter.Write(dset, sept, sset)
 		if elemWErr != nil {
 			err = errors.Join(

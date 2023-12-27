@@ -15,6 +15,11 @@ func NewStruct(cfg *Writers, typ reflect2.Type) (w Writer, err error) {
 		w, err = NewSQLWriter(typ)
 		return
 	}
+	// time
+	if typ.RType() == timeType.RType() || typ.Type1().ConvertibleTo(timeType.Type1()) {
+		w = NewTimeWriter(typ)
+		return
+	}
 	// set processing
 	sw := &StructWriter{
 		tagKey: cfg.tagKey,
@@ -32,10 +37,7 @@ func NewStruct(cfg *Writers, typ reflect2.Type) (w Writer, err error) {
 			err = fwErr
 			return
 		}
-
 		tag, _ := sft.Tag().Lookup(cfg.tagKey)
-		fmt.Println("struct field:", ft.String(), fw.Type(), cfg.tagKey, tag)
-
 		fields = append(fields, &StructFieldWriter{
 			typ:    sft,
 			tag:    tag,
@@ -65,15 +67,42 @@ func (w *StructWriter) Type() reflect2.Type {
 }
 
 func (w *StructWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+	if srcType.Kind() == reflect.Ptr {
+		srcType = srcType.(reflect2.PtrType).Elem()
+	}
+
+	// same
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	if srcType.Kind() == reflect.Ptr {
-		srcType = srcType.(reflect2.PtrType).Elem()
+	// convertible
+	if w.typ.Type1().ConvertibleTo(srcType.Type1()) {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
+		return
+	}
+	// sql
+	if IsSQLValue(srcType) {
+		valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
+		if !isValuer {
+			err = fmt.Errorf("copier: struct writer can not support %s source type", srcType.String())
+			return
+		}
+		value, valueErr := valuer.Value()
+		if valueErr != nil {
+			err = valueErr
+			return
+		}
+		if reflect2.IsNil(value) {
+			return
+		}
+		err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+		if err != nil {
+			return
+		}
+		return
 	}
 	desc := descriptors.DescribeStruct(srcType)
-
 	for _, field := range w.fields {
 		var srcField *descriptors.StructFieldDescriptor
 		if field.tag == "" {
@@ -93,42 +122,9 @@ func (w *StructWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTy
 			continue
 		}
 		dft := field.typ.Type()
-
-		// same
-		if sft.RType() == dft.RType() {
-			field.typ.UnsafeSet(dstPtr, sfp)
-			continue
-		}
-		// convertible
-		if sft.Type1().ConvertibleTo(dft.Type1()) {
-			field.typ.UnsafeSet(dstPtr, sfp)
-			continue
-		}
-		// dfp
 		dfp := field.typ.UnsafeGet(dstPtr)
 		if dft.UnsafeIsNil(dfp) {
 			dfp = dft.UnsafeNew()
-		}
-		// sql
-		if IsSQLValue(sft) {
-			valuer, isValuer := sft.PackEFace(sfp).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: struct writer can not support %s source type", srcType.String())
-				return
-			}
-			value, valueErr := valuer.Value()
-			if valueErr != nil {
-				err = valueErr
-				return
-			}
-			if reflect2.IsNil(value) {
-				continue
-			}
-			err = field.writer.Write(dfp, reflect2.PtrOf(value), reflect2.TypeOf(value))
-			if err != nil {
-				return
-			}
-			continue
 		}
 		err = field.writer.Write(dfp, sfp, sft)
 		if err != nil {

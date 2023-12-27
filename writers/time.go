@@ -32,6 +32,11 @@ func (w *TimeWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
+	// convertible
+	if w.typ.Type1().ConvertibleTo(srcType.Type1()) {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
+		return
+	}
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)
