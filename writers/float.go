@@ -56,16 +56,11 @@ func (w *FloatWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTyp
 		w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(float64(u)))
 		break
 	case reflect.Struct, reflect.Ptr:
-		// time
-		if IsTime(srcType) {
-			w.typ.UnsafeSet(dstPtr, TimeToInt(srcPtr))
-			break
-		}
 		// sql
 		if IsSQLValue(srcType) {
 			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
 			if !isValuer {
-				err = fmt.Errorf("copier: int writer can not support %s source type", srcType.String())
+				err = fmt.Errorf("copier: float writer can not support %s source type", srcType.String())
 				return
 			}
 			value, valueErr := valuer.Value()
