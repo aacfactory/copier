@@ -145,7 +145,7 @@ func TestValueOf(t *testing.T) {
 		SQLTime:   sql.NullTime{Time: time.Now(), Valid: true},
 		SQLString: sql.NullString{String: "x", Valid: false},
 	}
-	dst, err := copier.ValueOf[Foo](bar)
+	dst, err := copier.From[Foo](bar)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -184,7 +184,7 @@ type SS struct {
 }
 
 func TestValueOf2(t *testing.T) {
-	si, siErr := copier.ValueOf[SI](SS{
+	si, siErr := copier.From[SI](SS{
 		Id:   "1",
 		Name: "name",
 		Bar:  "bar",
@@ -196,14 +196,14 @@ func TestValueOf2(t *testing.T) {
 	}
 	fmt.Println(fmt.Sprintf("%+v", si))
 
-	ss, ssErr := copier.ValueOf[SS](si)
+	ss, ssErr := copier.From[SS](si)
 	if ssErr != nil {
 		fmt.Println(ssErr)
 		return
 	}
 	fmt.Println(fmt.Sprintf("%+v", ss))
 
-	si1, si1Err := copier.ValueOf[SI](si)
+	si1, si1Err := copier.From[SI](si)
 	if si1Err != nil {
 		fmt.Println(si1Err)
 		return

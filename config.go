@@ -8,6 +8,12 @@ import (
 	"reflect"
 )
 
+var (
+	DefaultConfig = Config{
+		TagKey: "copier",
+	}.Freeze()
+)
+
 type Config struct {
 	TagKey string
 }

@@ -4,11 +4,17 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"github.com/aacfactory/copier/descriptors"
 	"github.com/modern-go/reflect2"
 	"golang.org/x/sync/singleflight"
 	"reflect"
 	"sync"
 	"unsafe"
+)
+
+var (
+	writerGroupSuffix = []byte("11111111")
+	descGroupSuffix   = []byte("22222222")
 )
 
 type Writer interface {
@@ -59,6 +65,7 @@ type Writers struct {
 	processing   sync.Map
 	group        *singleflight.Group
 	groupKeyPool *sync.Pool
+	descriptors  sync.Map
 }
 
 func (cfg *Writers) set(rtype uintptr, w Writer) {
@@ -80,9 +87,10 @@ func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
 	if cachedGroupKey != nil {
 		groupKeyBytes = cachedGroupKey.([]byte)
 	} else {
-		groupKeyBytes = make([]byte, 8)
+		groupKeyBytes = make([]byte, 16)
 	}
 	binary.LittleEndian.PutUint64(groupKeyBytes, rtype)
+	copy(groupKeyBytes[8:], writerGroupSuffix)
 	groupKey := unsafe.String(unsafe.SliceData(groupKeyBytes), len(groupKeyBytes))
 	v, _, _ := cfg.group.Do(groupKey, func() (interface{}, error) {
 		vv, objErr := WriterOf(cfg, typ)
@@ -93,7 +101,35 @@ func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
 		return vv, nil
 	})
 	cfg.group.Forget(groupKey)
+	cfg.groupKeyPool.Put(groupKeyBytes)
 	obj = v.(Writer)
+	return
+}
+
+func (cfg *Writers) descriptorStruct(typ reflect2.Type) (desc *descriptors.StructDescriptor, err error) {
+	rtype := uint64(typ.RType())
+	if cached, exit := cfg.descriptors.Load(rtype); exit {
+		desc = cached.(*descriptors.StructDescriptor)
+		return
+	}
+	var groupKeyBytes []byte
+	cachedGroupKey := cfg.groupKeyPool.Get()
+	if cachedGroupKey != nil {
+		groupKeyBytes = cachedGroupKey.([]byte)
+	} else {
+		groupKeyBytes = make([]byte, 16)
+	}
+	binary.LittleEndian.PutUint64(groupKeyBytes, rtype)
+	copy(groupKeyBytes[8:], descGroupSuffix)
+	groupKey := unsafe.String(unsafe.SliceData(groupKeyBytes), len(groupKeyBytes))
+	v, _, _ := cfg.group.Do(groupKey, func() (interface{}, error) {
+		vv := descriptors.DescribeStruct(typ)
+		cfg.descriptors.Store(rtype, vv)
+		return vv, nil
+	})
+	cfg.group.Forget(groupKey)
+	cfg.groupKeyPool.Put(groupKeyBytes)
+	desc = v.(*descriptors.StructDescriptor)
 	return
 }
 
