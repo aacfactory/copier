@@ -77,6 +77,9 @@ func (w *SQLNullFloatWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer,
 				err = valueErr
 				return
 			}
+			if reflect2.IsNil(value) {
+				return
+			}
 			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
 			return
 		}

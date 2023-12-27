@@ -2,6 +2,7 @@ package copier_test
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/copier"
@@ -17,11 +18,15 @@ type User struct {
 }
 
 type NullJson[E any] struct {
-	Value E
+	E     E
 	Valid bool
 }
 
-func (n NullJson[E]) Scan(src any) error {
+func (n NullJson[E]) Value() (driver.Value, error) {
+	return n.E, nil
+}
+
+func (n *NullJson[E]) Scan(src any) error {
 	return nil
 }
 
@@ -70,6 +75,12 @@ type Faz struct {
 func TestCopy(t *testing.T) {
 	foo := &Foo{}
 	bar := Bar{
+		User: NullJson[User]{
+			E: User{
+				Name: "name",
+			},
+			Valid: true,
+		},
 		Str:   "str",
 		Now:   time.Now(),
 		X:     100,
@@ -85,15 +96,20 @@ func TestCopy(t *testing.T) {
 			"b": {X: "b"},
 			"c": {X: "c"},
 		},
-		SQLTime:   sql.NullTime{Time: time.Now()},
+		SQLTime:   sql.NullTime{Time: time.Now(), Valid: true},
 		SQLString: sql.NullString{String: "x"},
 	}
 	err := copier.Copy(foo, bar)
 	fmt.Println(err)
 	fmt.Println(fmt.Sprintf("%+v", foo))
+	fmt.Println(time.Time(foo.Time).String())
+	fmt.Println(foo.Baz)
 	fmt.Println(foo.Bazz)
-	fmt.Println(foo.Bazs[0])
-	fmt.Println(foo.MM["a"])
+	fmt.Println(len(foo.Bazs), foo.Bazs == nil, foo.Bazs)
+	fmt.Println(len(foo.Bazzs), foo.Bazzs == nil, foo.Bazzs)
+
+	//fmt.Println(foo.Bazs[0])
+	//fmt.Println(foo.MM["a"])
 }
 
 func TestArray(t *testing.T) {
@@ -124,7 +140,7 @@ func TestMap(t *testing.T) {
 func TestValueOf(t *testing.T) {
 	bar := Bar{
 		User: NullJson[User]{
-			Value: User{Name: "username"},
+			E:     User{Name: "username"},
 			Valid: true,
 		},
 		Str:   "str",

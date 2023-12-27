@@ -133,8 +133,7 @@ func WriterOf(cfg *Writers, typ reflect2.Type) (v Writer, err error) {
 		v, err = NewStruct(cfg, typ)
 		break
 	case reflect.Ptr:
-		typ = typ.(reflect2.PtrType).Elem()
-		v, err = WriterOf(cfg, typ)
+		v, err = NewPtrWriter(cfg, typ.(reflect2.PtrType))
 		break
 	case reflect.Slice:
 		v, err = NewSliceType(cfg, typ.(reflect2.SliceType))

@@ -83,6 +83,9 @@ func (w *BytesWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTyp
 				err = valueErr
 				return
 			}
+			if reflect2.IsNil(value) {
+				return
+			}
 			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
 			return
 		}

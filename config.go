@@ -10,7 +10,7 @@ import (
 
 var (
 	DefaultConfig = Config{
-		TagKey: "copier",
+		TagKey: "copy",
 	}.Freeze()
 )
 

@@ -54,6 +54,10 @@ func (w *SQLNullGenericWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointe
 			err = valueErr
 			return
 		}
+		fmt.Println("sql generic:", value, valueErr)
+		if reflect2.IsNil(value) {
+			return
+		}
 		err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
 		return
 	}
