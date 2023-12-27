@@ -13,6 +13,11 @@ type StructFieldDescriptor struct {
 	anon  *reflect2.UnsafeStructType
 }
 
+func (desc *StructFieldDescriptor) StructField() reflect2.StructField {
+	fLen := len(desc.Field)
+	return desc.Field[fLen-1]
+}
+
 func (desc *StructFieldDescriptor) ValueOf(ptr unsafe.Pointer) (v unsafe.Pointer, typ reflect2.Type, err error) {
 	fieldPtr := ptr
 	for i, f := range desc.Field {

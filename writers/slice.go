@@ -13,7 +13,7 @@ func NewSliceType(cfg *Writers, typ reflect2.SliceType) (v Writer, err error) {
 		v = NewBytesWriter(typ)
 		return
 	}
-	elemWriter, elemErr := WriterOf(cfg, elemType)
+	elemWriter, elemErr := cfg.Get(elemType)
 	if elemErr != nil {
 		err = fmt.Errorf("copier: not support %s dst type, %v", typ.String(), elemErr)
 		return

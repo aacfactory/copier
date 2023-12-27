@@ -8,7 +8,8 @@ import (
 )
 
 type Anonymous struct {
-	Anonymous string
+	AnonymousKey   string
+	AnonymousValue string
 }
 
 type Bar struct {
@@ -33,12 +34,13 @@ type Foo struct {
 	Baz     *Bar
 	Bars    []Bar
 	Map     map[string]Bar
+	sss     string
 }
 
 func TestStructFields_Get(t *testing.T) {
 	foo := Foo{
 		Anonymous: Anonymous{
-			Anonymous: "Anonymous",
+			AnonymousValue: "AnonymousValue",
 		},
 		String:  "xxx",
 		Boolean: false,
@@ -65,14 +67,22 @@ func TestStructFields_Get(t *testing.T) {
 			return
 		}
 		fv := fType.UnsafeIndirect(fp)
-		t.Log("name:", f.Name, "type:", fType, "value:", fv)
+		t.Log("name:", f.Name, "type:", fType, "value:", fv, fType.UnsafeIsNil(fp))
 	}
 	f := desc.FieldByTag("copier", "str")
 	t.Log(f)
 	v := Foo{}
 	vp := reflect2.PtrOf(&v)
-	anoF := desc.Field("Anonymous")
+	anoF := desc.Field("AnonymousValue")
 	_, anoFT, _ := anoF.ValueOf(vp)
 	anoFT.UnsafeSet(vp, reflect2.PtrOf("ano"))
-	t.Log(v.Anonymous.Anonymous)
+	t.Log(v.Anonymous.AnonymousValue)
+	t.Log("-----------")
+	for _, fieldDescriptor := range desc.Fields() {
+		t.Log(fieldDescriptor.Name, "---")
+		for _, field := range fieldDescriptor.Field {
+			t.Log(field.StructField.Name)
+		}
+		t.Log("***")
+	}
 }

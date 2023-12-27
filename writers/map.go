@@ -8,14 +8,14 @@ import (
 
 func NewMapType(cfg *Writers, typ reflect2.MapType) (v Writer, err error) {
 	keyType := typ.Key()
-	keyWriter, keyErr := WriterOf(cfg, keyType)
+	keyWriter, keyErr := cfg.Get(keyType)
 	if keyErr != nil {
 		err = fmt.Errorf("copier: not support %s dst type, %v", typ.String(), keyErr)
 		return
 	}
 
 	valueType := typ.Elem()
-	valueWriter, valueErr := WriterOf(cfg, valueType)
+	valueWriter, valueErr := cfg.Get(valueType)
 	if valueErr != nil {
 		err = fmt.Errorf("copier: not support %s dst type, %v", typ.String(), valueErr)
 		return
