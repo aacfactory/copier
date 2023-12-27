@@ -84,7 +84,7 @@ func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
 	}
 	binary.LittleEndian.PutUint64(groupKeyBytes, rtype)
 	groupKey := unsafe.String(unsafe.SliceData(groupKeyBytes), len(groupKeyBytes))
-	v, _, _ := cfg.group.Do(groupKey, func() (interface{}, error) {
+	v, vErr, _ := cfg.group.Do(groupKey, func() (interface{}, error) {
 		vv, objErr := WriterOf(cfg, typ)
 		if objErr != nil {
 			return nil, objErr
@@ -92,6 +92,10 @@ func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
 		cfg.cache.Store(rtype, vv)
 		return vv, nil
 	})
+	if vErr != nil {
+		err = vErr
+		return
+	}
 	cfg.group.Forget(groupKey)
 	cfg.groupKeyPool.Put(groupKeyBytes)
 	obj = v.(Writer)
@@ -127,6 +131,10 @@ func WriterOf(cfg *Writers, typ reflect2.Type) (v Writer, err error) {
 		break
 	case reflect.Struct:
 		v, err = NewStruct(cfg, typ)
+		break
+	case reflect.Ptr:
+		typ = typ.(reflect2.PtrType).Elem()
+		v, err = WriterOf(cfg, typ)
 		break
 	case reflect.Slice:
 		v, err = NewSliceType(cfg, typ.(reflect2.SliceType))
