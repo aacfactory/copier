@@ -6,15 +6,20 @@ import (
 	"unsafe"
 )
 
-func NewPtrWriter(cfg *Writers, typ reflect2.PtrType) (v Writer, err error) {
+func NewPtrWriter(cfg *Writers, typ reflect2.PtrType) (w Writer, err error) {
+	// generic writer
+	if typ.Implements(unsafeWriterType) {
+		w = NewGenericWriter(typ)
+		return
+	}
 	// sql
 	if typ.Implements(sqlValuerType) {
-		v, err = NewSQLWriter(typ)
+		w, err = NewSQLWriter(typ)
 		return
 	}
 	// text
-	if typ.Implements(textMarshalerType) {
-		v = NewTextUnmarshalerWriter(typ)
+	if typ.Implements(textUnmarshalerType) {
+		w = NewTextUnmarshalerWriter(typ)
 		return
 	}
 	// ptr
@@ -24,7 +29,7 @@ func NewPtrWriter(cfg *Writers, typ reflect2.PtrType) (v Writer, err error) {
 		err = fmt.Errorf("copier: ptr not support %s dst type, %v", typ.String(), elemErr)
 		return
 	}
-	v = &PtrWriter{
+	w = &PtrWriter{
 		typ:        typ,
 		elemType:   elemType,
 		elemWriter: elemWriter,

@@ -27,4 +27,5 @@ var (
 	sqlValuerType       = reflect2.TypeOfPtr((*driver.Valuer)(nil)).Elem()
 	textMarshalerType   = reflect2.TypeOfPtr((*encoding.TextMarshaler)(nil)).Elem()
 	textUnmarshalerType = reflect2.TypeOfPtr((*encoding.TextUnmarshaler)(nil)).Elem()
+	unsafeWriterType    = reflect2.TypeOfPtr((*GenericWriter)(nil)).Elem()
 )
