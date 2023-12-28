@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/copier"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -107,9 +106,6 @@ func TestCopy(t *testing.T) {
 	fmt.Println(foo.Bazz)
 	fmt.Println(len(foo.Bazs), foo.Bazs == nil, foo.Bazs)
 	fmt.Println(len(foo.Bazzs), foo.Bazzs == nil, foo.Bazzs)
-
-	//fmt.Println(foo.Bazs[0])
-	//fmt.Println(foo.MM["a"])
 }
 
 func TestArray(t *testing.T) {
@@ -127,7 +123,7 @@ func TestArray(t *testing.T) {
 func TestMap(t *testing.T) {
 	dst := make(map[string]*Faz)
 	src := map[string]*Baz{
-		"a": &Baz{
+		"a": {
 			X: "b",
 		},
 	}
@@ -135,94 +131,4 @@ func TestMap(t *testing.T) {
 	fmt.Println(err)
 	fmt.Println(dst)
 	fmt.Println(dst["a"])
-}
-
-func TestValueOf(t *testing.T) {
-	bar := Bar{
-		User: NullJson[User]{
-			E:     User{Name: "username"},
-			Valid: true,
-		},
-		Str:   "str",
-		Now:   time.Now(),
-		X:     100,
-		Bytes: []byte(`{"a":1}`),
-		Baz:   Baz{X: "0"},
-		Bazz:  &Baz{X: "1"},
-		Bazs:  []Baz{{X: "1"}},
-		Bazzs: []*Baz{{X: "1"}},
-		IS:    []int{1, 2},
-		ISS:   [][]int{{1, 2}, {3, 4}},
-		MM: map[string]*Baz{
-			"a": {X: "a"},
-			"b": {X: "b"},
-			"c": {X: "c"},
-		},
-		SQLTime:   sql.NullTime{Time: time.Now(), Valid: true},
-		SQLString: sql.NullString{String: "x", Valid: false},
-	}
-	dst, err := copier.From[Foo](bar)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(fmt.Sprintf("%+v", dst))
-}
-
-type XUser struct {
-	NullJson[User]
-}
-
-func TestNullUser(t *testing.T) {
-	nu := XUser{}
-	rv := reflect.ValueOf(nu)
-	for i := 0; i < rv.NumField(); i++ {
-		fmt.Println(rv.Type().Field(i))
-	}
-}
-
-type Internal struct {
-	Id   string
-	Name string
-	s    string
-}
-
-type SI struct {
-	*Internal
-	Bar string
-}
-
-type SS struct {
-	Id   string
-	Name string
-	Bar  string
-	s    string
-}
-
-func TestValueOf2(t *testing.T) {
-	si, siErr := copier.From[SI](SS{
-		Id:   "1",
-		Name: "name",
-		Bar:  "bar",
-		s:    "s",
-	})
-	if siErr != nil {
-		fmt.Println(siErr)
-		return
-	}
-	fmt.Println(fmt.Sprintf("%+v", si))
-
-	ss, ssErr := copier.From[SS](si)
-	if ssErr != nil {
-		fmt.Println(ssErr)
-		return
-	}
-	fmt.Println(fmt.Sprintf("%+v", ss))
-
-	si1, si1Err := copier.From[SI](si)
-	if si1Err != nil {
-		fmt.Println(si1Err)
-		return
-	}
-	fmt.Println(fmt.Sprintf("%+v", si1))
 }

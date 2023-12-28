@@ -47,7 +47,7 @@ func NewStruct(cfg *Writers, typ reflect2.Type) (w Writer, err error) {
 	sw.fields = fields
 	// rem processing
 	cfg.removeProcessing(typ)
-	//
+	// return
 	w = sw
 	return
 }

@@ -17,7 +17,7 @@ type Writer interface {
 	Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error)
 }
 
-func New(tagKey string) *Writers {
+func New(tagKey string, extras ...Writer) *Writers {
 	w := &Writers{
 		tagKey:       tagKey,
 		cache:        sync.Map{},
@@ -26,30 +26,34 @@ func New(tagKey string) *Writers {
 		groupKeyPool: new(sync.Pool),
 	}
 	// native
-	w.set(reflect2.RTypeOf(""), NewStringWriter())
-	w.set(reflect2.RTypeOf(false), NewBoolWriter())
-	w.set(reflect2.RTypeOf(0), NewIntWriter())
-	w.set(reflect2.RTypeOf(int8(0)), NewIntWriter())
-	w.set(reflect2.RTypeOf(int16(0)), NewIntWriter())
-	w.set(reflect2.RTypeOf(int32(0)), NewIntWriter())
-	w.set(reflect2.RTypeOf(int64(0)), NewIntWriter())
-	w.set(reflect2.RTypeOf(float32(0)), NewFloatWriter())
-	w.set(reflect2.RTypeOf(float64(0)), NewFloatWriter())
-	w.set(reflect2.RTypeOf(uint(0)), NewUintWriter())
-	w.set(reflect2.RTypeOf(uint8(0)), NewUintWriter())
-	w.set(reflect2.RTypeOf(uint16(0)), NewUintWriter())
-	w.set(reflect2.RTypeOf(uint32(0)), NewUintWriter())
-	w.set(reflect2.RTypeOf(uint64(0)), NewUintWriter())
-	w.set(reflect2.RTypeOf([]byte{}), NewBytesWriter(bytesType))
+	w.Set(reflect2.RTypeOf(""), NewStringWriter())
+	w.Set(reflect2.RTypeOf(false), NewBoolWriter())
+	w.Set(reflect2.RTypeOf(0), NewIntWriter())
+	w.Set(reflect2.RTypeOf(int8(0)), NewIntWriter())
+	w.Set(reflect2.RTypeOf(int16(0)), NewIntWriter())
+	w.Set(reflect2.RTypeOf(int32(0)), NewIntWriter())
+	w.Set(reflect2.RTypeOf(int64(0)), NewIntWriter())
+	w.Set(reflect2.RTypeOf(float32(0)), NewFloatWriter())
+	w.Set(reflect2.RTypeOf(float64(0)), NewFloatWriter())
+	w.Set(reflect2.RTypeOf(uint(0)), NewUintWriter())
+	w.Set(reflect2.RTypeOf(uint8(0)), NewUintWriter())
+	w.Set(reflect2.RTypeOf(uint16(0)), NewUintWriter())
+	w.Set(reflect2.RTypeOf(uint32(0)), NewUintWriter())
+	w.Set(reflect2.RTypeOf(uint64(0)), NewUintWriter())
+	w.Set(reflect2.RTypeOf([]byte{}), NewBytesWriter(bytesType))
 	// sql
-	w.set(reflect2.RTypeOf(sql.NullString{}), NewUnsafeSQLWriter(sqlNullStringType))
-	w.set(reflect2.RTypeOf(sql.NullByte{}), NewUnsafeSQLWriter(sqlNullByteType))
-	w.set(reflect2.RTypeOf(sql.NullBool{}), NewUnsafeSQLWriter(sqlNullBoolType))
-	w.set(reflect2.RTypeOf(sql.NullInt16{}), NewUnsafeSQLWriter(sqlNullInt16Type))
-	w.set(reflect2.RTypeOf(sql.NullInt32{}), NewUnsafeSQLWriter(sqlNullInt32Type))
-	w.set(reflect2.RTypeOf(sql.NullInt64{}), NewUnsafeSQLWriter(sqlNullInt64Type))
-	w.set(reflect2.RTypeOf(sql.NullFloat64{}), NewUnsafeSQLWriter(sqlNullFloat64Type))
-	w.set(reflect2.RTypeOf(sql.NullTime{}), NewUnsafeSQLWriter(sqlNullTimeType))
+	w.Set(reflect2.RTypeOf(sql.NullString{}), NewUnsafeSQLWriter(sqlNullStringType))
+	w.Set(reflect2.RTypeOf(sql.NullByte{}), NewUnsafeSQLWriter(sqlNullByteType))
+	w.Set(reflect2.RTypeOf(sql.NullBool{}), NewUnsafeSQLWriter(sqlNullBoolType))
+	w.Set(reflect2.RTypeOf(sql.NullInt16{}), NewUnsafeSQLWriter(sqlNullInt16Type))
+	w.Set(reflect2.RTypeOf(sql.NullInt32{}), NewUnsafeSQLWriter(sqlNullInt32Type))
+	w.Set(reflect2.RTypeOf(sql.NullInt64{}), NewUnsafeSQLWriter(sqlNullInt64Type))
+	w.Set(reflect2.RTypeOf(sql.NullFloat64{}), NewUnsafeSQLWriter(sqlNullFloat64Type))
+	w.Set(reflect2.RTypeOf(sql.NullTime{}), NewUnsafeSQLWriter(sqlNullTimeType))
+	// extras
+	for _, extra := range extras {
+		w.Set(extra.Type().RType(), extra)
+	}
 	return w
 }
 
@@ -61,7 +65,7 @@ type Writers struct {
 	groupKeyPool *sync.Pool
 }
 
-func (cfg *Writers) set(rtype uintptr, w Writer) {
+func (cfg *Writers) Set(rtype uintptr, w Writer) {
 	cfg.cache.Store(rtype, w)
 }
 

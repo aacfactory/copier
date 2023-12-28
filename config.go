@@ -15,39 +15,52 @@ var (
 )
 
 type Config struct {
-	TagKey string
+	TagKey  string
+	Writers []writers.Writer
+}
+
+func (c Config) Register(w writers.Writer) {
+	c.Writers = append(c.Writers, w)
 }
 
 func (c Config) Freeze() API {
 	api := &frozenConfig{
-		config:  c,
-		writers: writers.New(c.TagKey),
+		writers: writers.New(c.TagKey, c.Writers...),
 	}
 	return api
 }
 
-// API represents a frozen Config.
 type API interface {
 	Copy(dst any, src any) (err error)
 }
 
 type frozenConfig struct {
-	config  Config
 	writers *writers.Writers
 }
 
 func (cfg *frozenConfig) Copy(dst any, src any) (err error) {
+
+	if src == nil {
+		err = fmt.Errorf("copier: src must not be nil")
+		return
+	}
+	if dst == nil {
+		err = fmt.Errorf("copier: dst must not be nil")
+		return
+	}
+
 	dstType := reflect2.TypeOf(dst)
 	if dstType.Kind() != reflect.Ptr {
 		err = fmt.Errorf("copier: dst must be ptr")
 		return
 	}
-	if reflect2.IsNil(dst) {
-		err = fmt.Errorf("copier: dst must not be nil")
-		return
-	}
-	if src == nil {
-		err = fmt.Errorf("copier: src must not be nil")
+	dstPtr := reflect2.PtrOf(dst)
+
+	srcType := reflect2.TypeOf(src)
+	srcPtr := reflect2.PtrOf(src)
+
+	if dstType.RType() == srcType.RType() {
+		dstType.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
 
@@ -56,7 +69,7 @@ func (cfg *frozenConfig) Copy(dst any, src any) (err error) {
 		err = errors.Join(errors.New("copier: copy failed"), dstErr)
 		return
 	}
-	if err = dstObj.Write(reflect2.PtrOf(dst), reflect2.PtrOf(src), reflect2.TypeOf(src)); err != nil {
+	if err = dstObj.Write(dstPtr, srcPtr, srcType); err != nil {
 		err = errors.Join(errors.New("copier: copy failed"), err)
 		return
 	}
