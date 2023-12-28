@@ -28,6 +28,10 @@ func (w *IntWriter) Type() reflect2.Type {
 }
 
 func (w *IntWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
+	}
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)

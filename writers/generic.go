@@ -30,12 +30,16 @@ func (w *GenericInterfaceWriter) Type() reflect2.Type {
 }
 
 func (w *GenericInterfaceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	if w.typ.IsNil(dstPtr) {
-		return
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
 	}
 	uw, ok := w.typ.PackEFace(dstPtr).(GenericWriter)
 	if !ok {
 		err = fmt.Errorf("copier: generic writer can not support %s dst type", reflect2.TypeOf(w.typ.UnsafeIndirect(dstPtr)))
+		return
+	}
+	if uw == nil {
 		return
 	}
 	err = uw.UnsafeWrite(srcPtr, srcType)

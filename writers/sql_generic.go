@@ -31,6 +31,10 @@ func (w *SQLNullGenericWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointe
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
+	}
 	if srcType.UnsafeIsNil(srcPtr) {
 		return
 	}

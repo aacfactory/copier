@@ -55,6 +55,10 @@ func (w *PtrWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType 
 	if srcType.UnsafeIsNil(srcPtr) {
 		return
 	}
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
+	}
 	err = w.elemWriter.Write(dstPtr, srcPtr, srcType)
 	return
 }

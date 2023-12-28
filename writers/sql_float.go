@@ -32,6 +32,10 @@ func (w *SQLNullFloatWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer,
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
+	}
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)

@@ -42,12 +42,17 @@ func (w *SliceWriter) Type() reflect2.Type {
 }
 
 func (w *SliceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+
 	if srcType.UnsafeIsNil(srcPtr) {
 		return
 	}
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
+	}
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
 	}
 	if srcType.Kind() != reflect.Slice {
 		err = fmt.Errorf("copier: slice writer can not support %s source type", srcType.String())

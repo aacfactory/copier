@@ -56,6 +56,10 @@ func (w *MapWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType 
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
+	}
 	if srcType.Kind() != reflect.Map {
 		err = fmt.Errorf("copier: map writer can not support %s source type", srcType.String())
 		return

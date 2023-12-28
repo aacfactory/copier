@@ -70,11 +70,14 @@ func (w *StructWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTy
 	if srcType.Kind() == reflect.Ptr {
 		srcType = srcType.(reflect2.PtrType).Elem()
 	}
-
 	// same
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
+	}
+	// convertable
+	if IsConvertible(srcType) {
+		srcPtr, srcType = convert(srcPtr, srcType)
 	}
 	// convertible
 	if w.typ.Type1().ConvertibleTo(srcType.Type1()) {
