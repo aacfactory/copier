@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/modern-go/reflect2"
 	"reflect"
-	"unsafe"
 )
 
 func NewTextUnmarshalerWriter(typ reflect2.Type) *TextUnmarshalerWriter {
@@ -27,15 +26,19 @@ func (w *TextUnmarshalerWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *TextUnmarshalerWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+func (w *TextUnmarshalerWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
+	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
-	}
+
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)
@@ -60,11 +63,10 @@ func (w *TextUnmarshalerWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Point
 		}
 		err = fmt.Errorf("copier: text unmarshaler writer can not support %s source type", srcType.String())
 		break
-	case reflect.Struct, reflect.Ptr:
+	case reflect.Struct:
 		// text
-		if IsText(srcType) {
-			marshaler := srcType.PackEFace(srcPtr).(encoding.TextMarshaler)
-			p, encodeErr := marshaler.MarshalText()
+		if value, ok := src.(encoding.TextMarshaler); ok {
+			p, encodeErr := value.MarshalText()
 			if encodeErr != nil {
 				err = encodeErr
 				return
@@ -75,26 +77,56 @@ func (w *TextUnmarshalerWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Point
 					return
 				}
 			}
-			break
+			return
 		}
 		// sql
-		if IsSQLValue(srcType) {
-			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: text unmarshaler writer can not support %s source type", srcType.String())
-				return
-			}
+		if valuer, ok := src.(driver.Valuer); ok {
 			value, valueErr := valuer.Value()
 			if valueErr != nil {
 				err = valueErr
 				return
 			}
-			if reflect2.IsNil(value) {
-				return
-			}
-			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 			return
 		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = fmt.Errorf("copier: text unmarshaler writer can not support %s source type", srcType.String())
+		return
+	case reflect.Ptr:
+		// text
+		if value, ok := src.(encoding.TextMarshaler); ok {
+			p, encodeErr := value.MarshalText()
+			if encodeErr != nil {
+				err = encodeErr
+				return
+			}
+			if len(p) > 0 {
+				unmarshaler := w.typ.PackEFace(dstPtr).(encoding.TextUnmarshaler)
+				if err = unmarshaler.UnmarshalText(p); err != nil {
+					return
+				}
+			}
+			return
+		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = w.Write(dst, srcType.Indirect(src))
+		break
 	default:
 		err = fmt.Errorf("copier: text unmarshaler writer can not support %s source type", srcType.String())
 		return
@@ -104,31 +136,4 @@ func (w *TextUnmarshalerWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Point
 
 func IsText(typ reflect2.Type) bool {
 	return typ.Implements(textMarshalerType)
-}
-
-func TextToString(ptr unsafe.Pointer, typ reflect2.Type) (unsafe.Pointer, error) {
-	src := typ.UnsafeIndirect(ptr)
-	if typ.IsNullable() && typ.UnsafeIsNil(ptr) {
-		return reflect2.PtrOf(""), nil
-	}
-	text := (src).(encoding.TextMarshaler)
-	p, encodeErr := text.MarshalText()
-	if encodeErr != nil {
-		return nil, encodeErr
-	}
-	s := unsafe.String(unsafe.SliceData(p), len(p))
-	return reflect2.PtrOf(s), nil
-}
-
-func TextToBytes(ptr unsafe.Pointer, typ reflect2.Type) (unsafe.Pointer, error) {
-	src := typ.UnsafeIndirect(ptr)
-	if typ.IsNullable() && typ.UnsafeIsNil(ptr) {
-		return reflect2.PtrOf([]byte{}), nil
-	}
-	text := (src).(encoding.TextMarshaler)
-	p, encodeErr := text.MarshalText()
-	if encodeErr != nil {
-		return nil, encodeErr
-	}
-	return reflect2.PtrOf(p), nil
 }

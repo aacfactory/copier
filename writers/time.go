@@ -27,20 +27,23 @@ func (w *TimeWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *TimeWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+func (w *TimeWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
+	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertible
-	if w.typ.Type1().ConvertibleTo(srcType.Type1()) {
+	if srcType.Type1().ConvertibleTo(w.typ.Type1()) {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
-	}
+
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)
@@ -59,30 +62,45 @@ func (w *TimeWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType
 		n := *(*uint64)(srcPtr)
 		w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(time.UnixMilli(int64(n))))
 		break
-	case reflect.Struct, reflect.Ptr:
+	case reflect.Struct:
 		// time
 		if IsTime(srcType) {
 			w.typ.UnsafeSet(dstPtr, srcPtr)
 			break
 		}
 		// sql
-		if IsSQLValue(srcType) {
-			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: time writer can not support %s source type", srcType.String())
-				return
-			}
+		if valuer, ok := src.(driver.Valuer); ok {
 			value, valueErr := valuer.Value()
 			if valueErr != nil {
 				err = valueErr
 				return
 			}
-			if reflect2.IsNil(value) {
-				return
-			}
-			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 			return
 		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = fmt.Errorf("copier: time writer can not support %s source type", srcType.String())
+		return
+	case reflect.Ptr:
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = w.Write(dst, srcType.Indirect(src))
+		break
 	default:
 		err = fmt.Errorf("copier: time writer can not support %s source type", srcType.String())
 		return
@@ -99,13 +117,6 @@ func TimeToString(ptr unsafe.Pointer) unsafe.Pointer {
 	timeType.UnsafeSet(reflect2.PtrOf(v), ptr)
 	s := v.Format(time.RFC3339)
 	return reflect2.PtrOf(s)
-}
-
-func TimeToBytes(ptr unsafe.Pointer) unsafe.Pointer {
-	v := new(time.Time)
-	timeType.UnsafeSet(reflect2.PtrOf(v), ptr)
-	s := v.Format(time.RFC3339)
-	return reflect2.PtrOf(reflect2.UnsafeCastString(s))
 }
 
 func TimeToInt(ptr unsafe.Pointer) unsafe.Pointer {

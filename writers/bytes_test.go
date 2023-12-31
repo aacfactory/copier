@@ -11,7 +11,7 @@ func TestBytesWriter_Write(t *testing.T) {
 	writer := writers.NewBytesWriter(reflect2.TypeOf([]byte{}))
 	dst := make([]byte, 0)
 	src := []byte("0123456789")
-	err := writer.Write(reflect2.PtrOf(&dst), reflect2.PtrOf(&src), reflect2.TypeOf(src))
+	err := writer.Write(&dst, &src)
 	if err != nil {
 		t.Error(err)
 		return
@@ -23,7 +23,7 @@ func TestBytesWriter_String(t *testing.T) {
 	writer := writers.NewBytesWriter(reflect2.TypeOf([]byte{}))
 	dst := make([]byte, 0)
 	src := "0123456789"
-	err := writer.Write(reflect2.PtrOf(&dst), reflect2.PtrOf(&src), reflect2.TypeOf(src))
+	err := writer.Write(&dst, &src)
 	if err != nil {
 		t.Error(err)
 		return
@@ -50,7 +50,7 @@ func TestBytesWriter_Text(t *testing.T) {
 	src := BytesText{
 		p: []byte("0123456789"),
 	}
-	err := writer.Write(reflect2.PtrOf(&dst), reflect2.PtrOf(&src), reflect2.TypeOf(src))
+	err := writer.Write(&dst, &src)
 	if err != nil {
 		t.Error(err)
 		return

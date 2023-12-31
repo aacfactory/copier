@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/modern-go/reflect2"
-	"unsafe"
 )
 
 type GenericWriter interface {
-	UnsafeWrite(srcPtr unsafe.Pointer, srcType reflect2.Type) (err error)
+	UnsafeWrite(obj any) (err error)
 }
 
 func NewGenericWriter(typ reflect2.Type) *GenericInterfaceWriter {
@@ -29,20 +28,39 @@ func (w *GenericInterfaceWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *GenericInterfaceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
+func (w *GenericInterfaceWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
 	}
-	uw, ok := w.typ.PackEFace(dstPtr).(GenericWriter)
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
+	if w.typ.RType() == srcType.RType() {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
+		return
+	}
+
+	// convertable
+	if convertible, ok := src.(Convertible); ok {
+		value := convertible.Convert()
+		if value == nil {
+			return
+		}
+		err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+		return
+	}
+
+	uw, ok := dst.(GenericWriter)
 	if !ok {
-		err = fmt.Errorf("copier: generic writer can not support %s dst type", reflect2.TypeOf(w.typ.UnsafeIndirect(dstPtr)))
+		err = fmt.Errorf("copier: generic writer can not support %s dst type", reflect2.TypeOf(dst))
 		return
 	}
 	if uw == nil {
 		return
 	}
-	err = uw.UnsafeWrite(srcPtr, srcType)
+
+	err = uw.UnsafeWrite(srcType.Indirect(src))
 	if err != nil {
 		err = errors.Join(
 			fmt.Errorf("copier: %s generic writer failed", w.Name()),

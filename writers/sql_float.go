@@ -6,7 +6,6 @@ import (
 	"github.com/modern-go/reflect2"
 	"reflect"
 	"strconv"
-	"unsafe"
 )
 
 type SQLNullFloatWriter struct {
@@ -27,15 +26,24 @@ func (w *SQLNullFloatWriter) ValueType() reflect2.Type {
 	return w.valueType.Type()
 }
 
-func (w *SQLNullFloatWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+func (w *SQLNullFloatWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
+	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
+	if w.valueType.Type().RType() == srcType.RType() {
+		w.valueType.UnsafeSet(dstPtr, srcPtr)
+		w.validType.UnsafeSet(dstPtr, reflect2.PtrOf(true))
+		return
 	}
+
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)
@@ -68,25 +76,43 @@ func (w *SQLNullFloatWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer,
 		w.valueType.UnsafeSet(dstPtr, reflect2.PtrOf(float64(u)))
 		w.validType.UnsafeSet(dstPtr, reflect2.PtrOf(true))
 		break
-	case reflect.Struct, reflect.Ptr:
+	case reflect.Struct:
 		// sql
-		if IsSQLValue(srcType) {
-			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: sql null float writer can not support %s source type", srcType.String())
-				return
-			}
+		if valuer, ok := src.(driver.Valuer); ok {
 			value, valueErr := valuer.Value()
 			if valueErr != nil {
 				err = valueErr
 				return
 			}
-			if reflect2.IsNil(value) {
+			if value == nil {
 				return
 			}
-			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 			return
 		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = fmt.Errorf("copier: sql null float writer can not support %s type reader", srcType.String())
+		return
+	case reflect.Ptr:
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = w.Write(dst, srcType.Indirect(src))
+		break
 	default:
 		err = fmt.Errorf("copier: sql null float writer can not support %s type reader", srcType.String())
 		return

@@ -13,8 +13,8 @@ import (
 
 type Writer interface {
 	Name() string
-	Type() reflect2.Type
-	Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error)
+	Type() reflect.Type
+	Write(dst any, src any) (err error)
 }
 
 func New(tagKey string, extras ...Writer) *Writers {
@@ -70,12 +70,11 @@ func (cfg *Writers) Set(rtype uintptr, w Writer) {
 }
 
 func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
-	rtype := uint64(typ.RType())
-	if cached, exit := cfg.cache.Load(rtype); exit {
+	if cached := cfg.getCache(typ); cached != nil {
 		obj = cached.(Writer)
 		return
 	}
-	if cached, exit := cfg.processing.Load(rtype); exit {
+	if cached := cfg.getProcessing(typ); cached != nil {
 		obj = cached.(Writer)
 		return
 	}
@@ -86,6 +85,10 @@ func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
 	} else {
 		groupKeyBytes = make([]byte, 8)
 	}
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.(reflect2.PtrType).Elem()
+	}
+	rtype := uint64(typ.RType())
 	binary.LittleEndian.PutUint64(groupKeyBytes, rtype)
 	groupKey := unsafe.String(unsafe.SliceData(groupKeyBytes), len(groupKeyBytes))
 	v, vErr, _ := cfg.group.Do(groupKey, func() (interface{}, error) {
@@ -106,14 +109,50 @@ func (cfg *Writers) Get(typ reflect2.Type) (obj Writer, err error) {
 	return
 }
 
+func (cfg *Writers) getProcessing(typ reflect2.Type) Writer {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.(reflect2.PtrType).Elem()
+	}
+	rtype := uint64(typ.RType())
+	if cached, _ := cfg.processing.Load(rtype); cached != nil {
+		return cached.(Writer)
+	}
+	return nil
+}
+
 func (cfg *Writers) addProcessing(typ reflect2.Type, w Writer) {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.(reflect2.PtrType).Elem()
+	}
 	rtype := uint64(typ.RType())
 	cfg.processing.Store(rtype, w)
 }
 
 func (cfg *Writers) removeProcessing(typ reflect2.Type) {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.(reflect2.PtrType).Elem()
+	}
 	rtype := uint64(typ.RType())
 	cfg.processing.Delete(rtype)
+}
+
+func (cfg *Writers) setCache(typ reflect2.Type, w Writer) {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.(reflect2.PtrType).Elem()
+	}
+	rtype := uint64(typ.RType())
+	cfg.cache.Store(rtype, w)
+}
+
+func (cfg *Writers) getCache(typ reflect2.Type) Writer {
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.(reflect2.PtrType).Elem()
+	}
+	rtype := uint64(typ.RType())
+	if cached, _ := cfg.cache.Load(rtype); cached != nil {
+		return cached.(Writer)
+	}
+	return nil
 }
 
 func WriterOf(cfg *Writers, typ reflect2.Type) (v Writer, err error) {
@@ -143,7 +182,7 @@ func WriterOf(cfg *Writers, typ reflect2.Type) (v Writer, err error) {
 		v, err = NewSliceType(cfg, typ.(reflect2.SliceType))
 		break
 	case reflect.Map:
-		v, err = NewMapType(cfg, typ.(reflect2.MapType))
+		v, err = NewMapWriter(cfg, typ.(reflect2.MapType))
 		break
 	default:
 		err = fmt.Errorf("copier: not support %s dst type", typ.String())

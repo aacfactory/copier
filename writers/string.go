@@ -2,6 +2,7 @@ package writers
 
 import (
 	"database/sql/driver"
+	"encoding"
 	"fmt"
 	"github.com/modern-go/reflect2"
 	"reflect"
@@ -27,11 +28,19 @@ func (w *StringWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *StringWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
+func (w *StringWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
 	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
+	if w.typ.RType() == srcType.RType() {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
+		return
+	}
+
 	switch srcType.Kind() {
 	case reflect.String:
 		w.typ.UnsafeSet(dstPtr, srcPtr)
@@ -59,49 +68,74 @@ func (w *StringWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTy
 		s := strconv.FormatUint(v, 10)
 		w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(s))
 		break
-	case reflect.Struct, reflect.Ptr:
-		// time
-		if IsTime(srcType) {
-			w.typ.UnsafeSet(dstPtr, TimeToString(srcPtr))
-			break
-		}
+	case reflect.Struct:
 		// sql
-		if IsSQLValue(srcType) {
-			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: string writer can not support %s source type", srcType.String())
-				return
-			}
+		if valuer, ok := src.(driver.Valuer); ok {
 			value, valueErr := valuer.Value()
 			if valueErr != nil {
 				err = valueErr
 				return
 			}
-			if reflect2.IsNil(value) {
-				return
-			}
-			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		// time
+		if IsTime(srcType) {
+			w.typ.UnsafeSet(dstPtr, TimeToString(srcPtr))
 			return
 		}
 		// text
-		if IsText(srcType) {
-			ptr, ptrErr := TextToString(srcPtr, srcType)
-			if ptrErr != nil {
-				err = ptrErr
+		if value, ok := src.(encoding.TextMarshaler); ok {
+			p, encodeErr := value.MarshalText()
+			if encodeErr != nil {
+				err = encodeErr
 				return
 			}
-			w.typ.UnsafeSet(dstPtr, ptr)
-			break
+			s := unsafe.String(unsafe.SliceData(p), len(p))
+			w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(&s))
+			return
+		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
 		}
 		err = fmt.Errorf("copier: string writer can not support %s source type", srcType.String())
+		break
+	case reflect.Ptr:
+		// text
+		if value, ok := src.(encoding.TextMarshaler); ok {
+			p, encodeErr := value.MarshalText()
+			if encodeErr != nil {
+				err = encodeErr
+				return
+			}
+			s := unsafe.String(unsafe.SliceData(p), len(p))
+			w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(&s))
+			return
+		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = w.Write(dst, srcType.Indirect(src))
 		break
 	case reflect.Slice:
 		// bytes
 		if srcType.(reflect2.SliceType).Elem().Kind() == reflect.Uint8 {
 			p := *(*[]byte)(srcPtr)
 			s := unsafe.String(unsafe.SliceData(p), len(p))
-			w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(s))
-			break
+			w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(&s))
+			return
 		}
 		err = fmt.Errorf("copier: string writer can not support %s source type", srcType.String())
 		break

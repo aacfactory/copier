@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"github.com/modern-go/reflect2"
 	"reflect"
-	"unsafe"
 )
 
-func NewMapType(cfg *Writers, typ reflect2.MapType) (v Writer, err error) {
+func NewMapWriter(cfg *Writers, typ reflect2.MapType) (v Writer, err error) {
 	keyType := typ.Key()
 	keyWriter, keyErr := cfg.Get(keyType)
 	if keyErr != nil {
@@ -48,50 +47,80 @@ func (w *MapWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *MapWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	if srcType.UnsafeIsNil(srcPtr) {
+func (w *MapWriter) Write(dst any, src any) (err error) {
+	if src == nil {
 		return
 	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
+	fmt.Println(reflect.TypeOf(src))
+
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
-	}
-	if srcType.Kind() != reflect.Map {
+
+	switch srcType.Kind() {
+	case reflect.Map:
+		smt := srcType.(reflect2.MapType)
+		fmt.Println(src)
+		fmt.Println(srcType.Indirect(src))
+		iter := smt.Iterate(src)
+		for {
+			if !iter.HasNext() {
+				break
+			}
+			sk, sv := iter.Next()
+			dk := w.keyType.New()
+			kErr := w.keyWriter.Write(dk, sk)
+			if kErr != nil {
+				err = errors.Join(
+					fmt.Errorf("copier: %s map writer write key faield", w.typ.String()),
+					kErr,
+				)
+				return
+			}
+			dv := w.valueType.New()
+			vErr := w.valueWriter.Write(dv, sv)
+			if vErr != nil {
+				err = errors.Join(
+					fmt.Errorf("copier: %s map writer write value faield", w.typ.String()),
+					vErr,
+				)
+				return
+			}
+			w.typ.SetIndex(dst, dk, dv)
+		}
+		break
+	case reflect.Struct:
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
 		err = fmt.Errorf("copier: map writer can not support %s source type", srcType.String())
 		return
-	}
-	smt := srcType.(reflect2.MapType)
-	smkt := smt.Key()
-	smvt := smt.Elem()
-	iterator := smt.UnsafeIterate(srcPtr)
-	for {
-		if !iterator.HasNext() {
-			break
-		}
-		skp, sep := iterator.UnsafeNext()
-		dkp := w.keyType.UnsafeNew()
-		kErr := w.keyWriter.Write(dkp, skp, smkt)
-		if kErr != nil {
-			err = errors.Join(
-				fmt.Errorf("copier: %s map writer write key faield", w.typ.String()),
-				kErr,
-			)
+	case reflect.Ptr:
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 			return
 		}
-		dvp := w.valueType.UnsafeNew()
-		vErr := w.valueWriter.Write(dvp, sep, smvt)
-		if vErr != nil {
-			err = errors.Join(
-				fmt.Errorf("copier: %s map writer write value faield", w.typ.String()),
-				vErr,
-			)
-			return
-		}
-		w.typ.UnsafeSetIndex(dstPtr, dkp, dvp)
+		err = w.Write(dst, srcType.Indirect(src))
+		break
+	default:
+		err = fmt.Errorf("copier: map writer can not support %s source type", srcType.String())
+		return
 	}
 	return
 }

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/aacfactory/copier/descriptors"
 	"github.com/modern-go/reflect2"
-	"reflect"
-	"unsafe"
 )
 
 func NewStruct(cfg *Writers, typ reflect2.Type) (w Writer, err error) {
@@ -66,45 +64,35 @@ func (w *StructWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *StructWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	if srcType.Kind() == reflect.Ptr {
-		srcType = srcType.(reflect2.PtrType).Elem()
+func (w *StructWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
 	}
-	// same
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
-	}
+
 	// convertible
 	if w.typ.Type1().ConvertibleTo(srcType.Type1()) {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
 	// sql
-	if IsSQLValue(srcType) {
-		valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-		if !isValuer {
-			err = fmt.Errorf("copier: struct writer can not support %s source type", srcType.String())
-			return
-		}
+	if valuer, ok := src.(driver.Valuer); ok {
 		value, valueErr := valuer.Value()
 		if valueErr != nil {
 			err = valueErr
 			return
 		}
-		if reflect2.IsNil(value) {
-			return
-		}
-		err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
-		if err != nil {
-			return
-		}
+		err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 		return
 	}
+	fmt.Println(srcType, reflect2.TypeOfPtr(src))
 	desc := descriptors.DescribeStruct(srcType)
 	for _, field := range w.fields {
 		var srcField *descriptors.StructFieldDescriptor
@@ -124,16 +112,17 @@ func (w *StructWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTy
 		if sft.UnsafeIsNil(sfp) {
 			continue
 		}
+		sf := sft.PackEFace(sfp)
 		dft := field.typ.Type()
-		dfp := field.typ.UnsafeGet(dstPtr)
-		if dft.UnsafeIsNil(dfp) {
-			dfp = dft.UnsafeNew()
+		df := field.typ.Get(dst)
+		if dft.IsNil(df) {
+			df = dft.New()
 		}
-		err = field.writer.Write(dfp, sfp, sft)
+		err = field.writer.Write(df, sf)
 		if err != nil {
 			return
 		}
-		field.typ.UnsafeSet(dstPtr, dfp)
+		field.typ.Set(dst, df)
 	}
 	return
 }

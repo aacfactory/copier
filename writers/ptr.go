@@ -3,7 +3,6 @@ package writers
 import (
 	"fmt"
 	"github.com/modern-go/reflect2"
-	"unsafe"
 )
 
 func NewPtrWriter(cfg *Writers, typ reflect2.PtrType) (w Writer, err error) {
@@ -51,14 +50,30 @@ func (w *PtrWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *PtrWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	if srcType.UnsafeIsNil(srcPtr) {
+func (w *PtrWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
+	}
+
+	srcPtrType := reflect2.TypeOfPtr(src)
+	srcType := srcPtrType.Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
+	if w.typ.RType() == srcType.RType() {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
 	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
+	if convertible, ok := src.(Convertible); ok {
+		value := convertible.Convert()
+		if value == nil {
+			return
+		}
+		err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+		return
 	}
-	err = w.elemWriter.Write(dstPtr, srcPtr, srcType)
+
+	err = w.elemWriter.Write(dst, srcType.PackEFace(reflect2.PtrOf(srcPtrType.Indirect(src))))
 	return
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/modern-go/reflect2"
 	"reflect"
-	"unsafe"
 )
 
 func NewSliceType(cfg *Writers, typ reflect2.SliceType) (v Writer, err error) {
@@ -41,21 +40,21 @@ func (w *SliceWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *SliceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+func (w *SliceWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
+	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
 
-	if srcType.UnsafeIsNil(srcPtr) {
-		return
-	}
-	if w.typ.RType() == srcType.RType() {
-		w.typ.UnsafeSet(dstPtr, srcPtr)
-		return
-	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
-	}
 	if srcType.Kind() != reflect.Slice {
 		err = fmt.Errorf("copier: slice writer can not support %s source type", srcType.String())
+		return
+	}
+
+	if w.typ.RType() == srcType.RType() {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
 	sst := srcType.(reflect2.SliceType)
@@ -63,11 +62,10 @@ func (w *SliceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTyp
 	if srcLen == 0 {
 		return
 	}
-	sset := sst.Elem()
 	for i := 0; i < srcLen; i++ {
-		sept := sst.UnsafeGetIndex(srcPtr, i)
-		dset := w.elemType.UnsafeNew()
-		elemWErr := w.elemWriter.Write(dset, sept, sset)
+		se := sst.GetIndex(src, i)
+		de := w.elemType.New()
+		elemWErr := w.elemWriter.Write(de, se)
 		if elemWErr != nil {
 			err = errors.Join(
 				fmt.Errorf("copier: %s slice writer write element faield", w.typ.String()),
@@ -75,7 +73,7 @@ func (w *SliceWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcTyp
 			)
 			return
 		}
-		w.typ.UnsafeAppend(dstPtr, dset)
+		w.typ.Append(dst, de)
 	}
 	return
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/modern-go/reflect2"
 	"reflect"
 	"strconv"
-	"unsafe"
 )
 
 func NewUintWriter() Writer {
@@ -27,11 +26,19 @@ func (w *UintWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *UintWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
+func (w *UintWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
 	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
+	if w.typ.RType() == srcType.RType() {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
+		return
+	}
+
 	switch srcType.Kind() {
 	case reflect.String:
 		s := *(*string)(srcPtr)
@@ -59,30 +66,47 @@ func (w *UintWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		break
-	case reflect.Struct, reflect.Ptr:
-		// time
-		if IsTime(srcType) {
-			w.typ.UnsafeSet(dstPtr, TimeToInt(srcPtr))
-			break
-		}
+	case reflect.Struct:
 		// sql
-		if IsSQLValue(srcType) {
-			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: int writer can not support %s source type", srcType.String())
-				return
-			}
+		if valuer, ok := src.(driver.Valuer); ok {
 			value, valueErr := valuer.Value()
 			if valueErr != nil {
 				err = valueErr
 				return
 			}
-			if reflect2.IsNil(value) {
+			if value == nil {
 				return
 			}
-			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 			return
 		}
+		// time
+		if IsTime(srcType) {
+			w.typ.UnsafeSet(dstPtr, TimeToInt(srcPtr))
+			return
+		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = fmt.Errorf("copier: uint writer can not support %s source reader", srcType.String())
+		return
+	case reflect.Ptr:
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = w.Write(dst, srcType.Indirect(src))
 		break
 	default:
 		err = fmt.Errorf("copier: uint writer can not support %s source reader", srcType.String())

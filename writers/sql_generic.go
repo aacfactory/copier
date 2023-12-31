@@ -4,8 +4,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"github.com/modern-go/reflect2"
-	"reflect"
-	"unsafe"
 )
 
 type SQLNullGenericWriter struct {
@@ -26,44 +24,48 @@ func (w *SQLNullGenericWriter) ValueType() reflect2.Type {
 	return w.valueType.Type()
 }
 
-func (w *SQLNullGenericWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
+func (w *SQLNullGenericWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
+	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
 	if w.typ.RType() == srcType.RType() {
 		w.typ.UnsafeSet(dstPtr, srcPtr)
 		return
 	}
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
-	}
-	if srcType.UnsafeIsNil(srcPtr) {
-		return
-	}
+
 	if w.valueType.Type().RType() == srcType.RType() {
 		w.valueType.UnsafeSet(dstPtr, srcPtr)
+		w.validType.UnsafeSet(dstPtr, reflect2.PtrOf(true))
 		return
 	}
-	if srcType.Type1().ConvertibleTo(w.validType.Type().Type1()) {
-		srcPtr = reflect.ValueOf(srcType.PackEFace(srcPtr)).Convert(w.validType.Type().Type1()).UnsafePointer()
-		w.typ.UnsafeSet(dstPtr, srcPtr)
-		return
-	}
-	if IsSQLValue(srcType) {
-		valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-		if !isValuer {
-			err = fmt.Errorf("copier: sql null generic writer can not support %s source type", srcType.String())
+
+	// convertable
+	if convertible, ok := src.(Convertible); ok {
+		value := convertible.Convert()
+		if value == nil {
 			return
 		}
+		err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+		return
+	}
+	// sql
+	if valuer, ok := src.(driver.Valuer); ok {
 		value, valueErr := valuer.Value()
 		if valueErr != nil {
 			err = valueErr
 			return
 		}
-		if reflect2.IsNil(value) {
+		if value == nil {
 			return
 		}
-		err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+		err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 		return
 	}
+
 	err = fmt.Errorf("copier: sql null generic writer can not support %s source type", srcType.String())
 	return
 }

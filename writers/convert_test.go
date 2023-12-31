@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (w Date) Convert() any {
+func (w *Date) Convert() any {
 	return time.Date(w.Year, w.Month, w.Day, 0, 0, 0, 0, time.Local)
 }
 
@@ -19,7 +19,7 @@ func TestIsConvertible(t *testing.T) {
 		Month: time.Now().Month(),
 		Day:   time.Now().Day(),
 	}
-	err := w.Write(reflect2.PtrOf(&dst), reflect2.PtrOf(src), reflect2.TypeOf(src))
+	err := w.Write(&dst, &src)
 	if err != nil {
 		t.Error(err)
 		return

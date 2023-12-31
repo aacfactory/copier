@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/aacfactory/copier"
+	"github.com/modern-go/reflect2"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -127,8 +129,24 @@ func TestMap(t *testing.T) {
 			X: "b",
 		},
 	}
-	err := copier.Copy(&dst, src)
+	err := copier.Copy(&dst, &src)
 	fmt.Println(err)
 	fmt.Println(dst)
 	fmt.Println(dst["a"])
+}
+
+func BenchmarkF1(b *testing.B) {
+	// 342631396                3.474 ns/op           0 B/op
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = reflect.TypeOf(Foo{})
+	}
+}
+
+func BenchmarkF2(b *testing.B) {
+	b.ReportAllocs()
+	// 64675731                17.78 ns/op            0 B/op
+	for i := 0; i < b.N; i++ {
+		_ = reflect2.TypeOf(Foo{})
+	}
 }

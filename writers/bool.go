@@ -6,7 +6,6 @@ import (
 	"github.com/modern-go/reflect2"
 	"reflect"
 	"strings"
-	"unsafe"
 )
 
 const (
@@ -21,7 +20,7 @@ func NewBoolWriter() Writer {
 }
 
 type BoolWriter struct {
-	typ reflect2.Type
+	typ reflect.Type
 }
 
 func (w *BoolWriter) Name() string {
@@ -32,11 +31,19 @@ func (w *BoolWriter) Type() reflect2.Type {
 	return w.typ
 }
 
-func (w *BoolWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType reflect2.Type) (err error) {
-	// convertable
-	if IsConvertible(srcType) {
-		srcPtr, srcType = convert(srcPtr, srcType)
+func (w *BoolWriter) Write(dst any, src any) (err error) {
+	if src == nil {
+		return
 	}
+	srcType := reflect2.TypeOfPtr(src).Elem()
+	srcPtr := reflect2.PtrOf(src)
+	dstPtr := reflect2.PtrOf(dst)
+
+	if w.typ.RType() == srcType.RType() {
+		w.typ.UnsafeSet(dstPtr, srcPtr)
+		return
+	}
+
 	switch srcType.Kind() {
 	case reflect.Bool:
 		w.typ.UnsafeSet(dstPtr, srcPtr)
@@ -59,25 +66,42 @@ func (w *BoolWriter) Write(dstPtr unsafe.Pointer, srcPtr unsafe.Pointer, srcType
 			w.typ.UnsafeSet(dstPtr, reflect2.PtrOf(true))
 		}
 		break
-	case reflect.Struct, reflect.Ptr:
+	case reflect.Struct:
 		// sql
-		if IsSQLValue(srcType) {
-			valuer, isValuer := srcType.PackEFace(srcPtr).(driver.Valuer)
-			if !isValuer {
-				err = fmt.Errorf("copier: bool writer can not support %s source type", srcType.String())
-				return
-			}
+		if valuer, ok := src.(driver.Valuer); ok {
 			value, valueErr := valuer.Value()
 			if valueErr != nil {
 				err = valueErr
 				return
 			}
-			if reflect2.IsNil(value) {
+			if value == nil {
 				return
 			}
-			err = w.Write(dstPtr, reflect2.PtrOf(value), reflect2.TypeOf(value))
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
 			return
 		}
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = fmt.Errorf("copier: bool writer can not support %s source type", srcType.String())
+		break
+	case reflect.Ptr:
+		// convertable
+		if convertible, ok := src.(Convertible); ok {
+			value := convertible.Convert()
+			if value == nil {
+				return
+			}
+			err = w.Write(dst, reflect2.TypeOf(value).PackEFace(reflect2.PtrOf(value)))
+			return
+		}
+		err = w.Write(dst, srcType.Indirect(src))
 		break
 	default:
 		err = fmt.Errorf("copier: bool writer can not support %s source type", srcType.String())
