@@ -1,152 +1,109 @@
 package copier_test
 
 import (
-	"database/sql"
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
 	"github.com/aacfactory/copier"
-	"github.com/modern-go/reflect2"
-	"reflect"
 	"testing"
 	"time"
 )
 
-type Date time.Time
-
-type User struct {
-	Name string
-}
-
-type NullJson[E any] struct {
-	E     E
-	Valid bool
-}
-
-func (n NullJson[E]) Value() (driver.Value, error) {
-	return n.E, nil
-}
-
-func (n *NullJson[E]) Scan(src any) error {
-	return nil
+type FooElem struct {
+	String string
+	Int    int `copy:"int"`
 }
 
 type Foo struct {
-	User      User
-	Str       string
-	IS        []int
-	ISS       [][]int
-	Time      Date `copy:"Time"`
-	I         int  `copy:"i"`
-	SQLTime   time.Time
-	SQLString string
-	Bytes     json.RawMessage
-	Baz       Faz
-	Bazz      *Faz
-	Bazs      []Faz
-	Bazzs     []*Faz
-	MM        map[string]*Baz
+	String string
+	Bool   bool
+	Int    int
+	Float  float64
+	Uint   uint
+	Byte   byte
+	Bytes  []byte
+	Time   time.Time
+	Slice  []FooElem
+	Map    map[string]FooElem
+}
+
+type BarElem struct {
+	String string
+	Int64  int `copy:"int"`
 }
 
 type Bar struct {
-	User      NullJson[User]
-	Str       string
-	Now       time.Time `copy:"Time"`
-	X         int64     `copy:"i"`
-	Bytes     []byte
-	Baz       Baz
-	Bazz      *Baz
-	Bazs      []Baz
-	Bazzs     []*Baz
-	IS        []int
-	ISS       [][]int
-	MM        map[string]*Baz
-	SQLTime   sql.NullTime
-	SQLString sql.NullString
-}
-
-type Baz struct {
-	X string
-}
-
-type Faz struct {
-	X string
+	String string
+	Bool   bool
+	Int    int
+	Float  float64
+	Uint   uint
+	Byte   byte
+	Bytes  []byte
+	Time   time.Time
+	Slice  []BarElem
+	Map    map[int]BarElem
 }
 
 func TestCopy(t *testing.T) {
-	foo := &Foo{}
+	foo := Foo{}
 	bar := Bar{
-		User: NullJson[User]{
-			E: User{
-				Name: "name",
-			},
-			Valid: true,
-		},
-		Str:   "str",
-		Now:   time.Now(),
-		X:     100,
-		Bytes: []byte(`{"a":1}`),
-		Baz:   Baz{X: "0"},
-		Bazz:  &Baz{X: "1"},
-		Bazs:  []Baz{{X: "1"}},
-		Bazzs: []*Baz{{X: "1"}},
-		IS:    []int{1, 2},
-		ISS:   [][]int{{1, 2}, {3, 4}},
-		MM: map[string]*Baz{
-			"a": {X: "a"},
-			"b": {X: "b"},
-			"c": {X: "c"},
-		},
-		SQLTime:   sql.NullTime{Time: time.Now(), Valid: true},
-		SQLString: sql.NullString{String: "x"},
+		String: "string",
+		Bool:   true,
+		Int:    1,
+		Float:  2.2,
+		Uint:   3,
+		Byte:   byte('B'),
+		Bytes:  []byte("bytes"),
+		Time:   time.Now(),
+		Slice:  []BarElem{{String: "1", Int64: 1}, {String: "2", Int64: 2}},
+		Map:    map[int]BarElem{1: {String: "1", Int64: 1}, 2: {String: "2", Int64: 2}},
 	}
-	err := copier.Copy(foo, bar)
-	fmt.Println(err)
-	fmt.Println(fmt.Sprintf("%+v", foo))
-	fmt.Println(time.Time(foo.Time).String())
-	fmt.Println(foo.Baz)
-	fmt.Println(foo.Bazz)
-	fmt.Println(len(foo.Bazs), foo.Bazs == nil, foo.Bazs)
-	fmt.Println(len(foo.Bazzs), foo.Bazzs == nil, foo.Bazzs)
-}
-
-func TestArray(t *testing.T) {
-	dst := make([]*Faz, 0, 1)
-	src := append(make([]*Faz, 0, 1), &Faz{
-		X: "d",
-	})
-	err := copier.Copy(&dst, src)
-	fmt.Println(err)
-	fmt.Println(dst)
-	fmt.Println(dst[0])
-
-}
-
-func TestMap(t *testing.T) {
-	dst := make(map[string]*Faz)
-	src := map[string]*Baz{
-		"a": {
-			X: "b",
-		},
+	err := copier.Copy(&foo, bar)
+	if err != nil {
+		t.Error(err)
+		return
 	}
-	err := copier.Copy(&dst, &src)
-	fmt.Println(err)
-	fmt.Println(dst)
-	fmt.Println(dst["a"])
+	t.Logf("%+v", foo)
 }
 
-func BenchmarkF1(b *testing.B) {
-	// 342631396                3.474 ns/op           0 B/op
+func TestValueOf(t *testing.T) {
+	bar := Bar{
+		String: "string",
+		Bool:   true,
+		Int:    1,
+		Float:  2.2,
+		Uint:   3,
+		Byte:   byte('B'),
+		Bytes:  []byte("bytes"),
+		Time:   time.Now(),
+		Slice:  []BarElem{{String: "1", Int64: 1}, {String: "2", Int64: 2}},
+		Map:    map[int]BarElem{1: {String: "1", Int64: 1}, 2: {String: "2", Int64: 2}},
+	}
+	foo, err := copier.ValueOf[Foo](bar)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%+v", foo)
+}
+
+func BenchmarkCopy(b *testing.B) {
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_ = reflect.TypeOf(Foo{})
+	bar := Bar{
+		String: "string",
+		Bool:   true,
+		Int:    1,
+		Float:  2.2,
+		Uint:   3,
+		Bytes:  []byte("bytes"),
+		Time:   time.Now(),
+		Slice:  []BarElem{{String: "1", Int64: 1}, {String: "2", Int64: 2}},
+		Map:    map[int]BarElem{1: {String: "1", Int64: 1}, 2: {String: "2", Int64: 2}},
 	}
-}
-
-func BenchmarkF2(b *testing.B) {
-	b.ReportAllocs()
-	// 64675731                17.78 ns/op            0 B/op
 	for i := 0; i < b.N; i++ {
-		_ = reflect2.TypeOf(Foo{})
+		foo := Foo{}
+		err := copier.Copy(&foo, bar)
+		if err != nil {
+			b.Error(err)
+			return
+		}
 	}
 }
