@@ -99,6 +99,11 @@ func copyStruct(dst reflect.Value, src reflect.Value) (err error) {
 		if !hasSrcField {
 			continue
 		}
+		if srcTag, hasSrcTag := srcFieldType.Tag.Lookup(tagKey); hasSrcTag {
+			if srcTag == discardTag {
+				continue
+			}
+		}
 		srcField := src.FieldByName(srcFieldType.Name)
 		dstField := dst.FieldByName(dstFieldType.Name)
 		if err = copyValue(dstField, srcField); err != nil {
