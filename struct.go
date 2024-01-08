@@ -2,11 +2,13 @@ package copier
 
 import (
 	"reflect"
+	"strings"
 )
 
 const (
 	tagKey     = "copy"
-	discardTag = "-"
+	discardTag = '-'
+	comma      = ','
 )
 
 func copyStruct(dst reflect.Value, src reflect.Value) (err error) {
@@ -75,39 +77,84 @@ func copyStruct(dst reflect.Value, src reflect.Value) (err error) {
 		if !dstFieldType.IsExported() {
 			continue
 		}
-		key := ""
+		srcFieldIdx := -1
+		setFn := ""
+		getFn := ""
 		tag, hasTag := dstFieldType.Tag.Lookup(tagKey)
 		if hasTag {
-			if tag == discardTag {
+			tag = strings.TrimSpace(tag)
+			if strings.IndexByte(tag, discardTag) == 0 {
 				continue
+			}
+			// set func of dst
+			if idx := strings.IndexByte(tag, comma); idx > -1 {
+				setFn = strings.TrimSpace(tag[idx+1:])
+				tag = strings.TrimSpace(tag[0:idx])
 			}
 			for j := 0; j < srcFieldNum; j++ {
 				srcField := srcType.Field(j)
 				srcTag, hasSrcTag := srcField.Tag.Lookup(tagKey)
-				if hasSrcTag && tag == srcTag {
-					key = srcField.Name
+				if hasSrcTag {
+					srcTag = strings.TrimSpace(srcTag)
+					if strings.IndexByte(srcTag, discardTag) == 0 {
+						continue
+					}
+					if idx := strings.IndexByte(srcTag, comma); idx > -1 {
+						getFn = strings.TrimSpace(srcTag[idx+1:])
+						srcTag = strings.TrimSpace(srcTag[0:idx])
+						if srcTag == tag || srcTag == dstFieldType.Name || srcField.Name == dstFieldType.Name || srcField.Name == tag {
+							srcFieldIdx = j
+							break
+						}
+						getFn = ""
+					}
+					continue
+				}
+				if srcFieldIdx > -1 || getFn != "" {
+					break
+				}
+				if srcField.Name == tag {
+					srcFieldIdx = j
 					break
 				}
 			}
+			if srcFieldIdx == -1 && getFn == "" {
+				setFn = ""
+			}
 		} else {
-			key = dstFieldType.Name
-		}
-		if key == "" {
-			continue
-		}
-		srcFieldType, hasSrcField := srcType.FieldByName(key)
-		if !hasSrcField {
-			continue
-		}
-		if srcTag, hasSrcTag := srcFieldType.Tag.Lookup(tagKey); hasSrcTag {
-			if srcTag == discardTag {
-				continue
+			for j := 0; j < srcFieldNum; j++ {
+				srcField := srcType.Field(j)
+				if srcField.Name == dstFieldType.Name {
+					srcFieldIdx = j
+					break
+				}
 			}
 		}
-		srcField := src.FieldByName(srcFieldType.Name)
-		dstField := dst.FieldByName(dstFieldType.Name)
-		if err = copyValue(dstField, srcField); err != nil {
-			return
+		var srcField reflect.Value
+		if srcFieldIdx == -1 && getFn == "" {
+			continue
+		}
+		if getFn != "" {
+			var getMethod reflect.Value
+			_, hasGetMethod := srcType.MethodByName(getFn)
+			if hasGetMethod {
+				getMethod = src.MethodByName(getFn)
+			} else {
+				continue
+			}
+			srcField = getMethod.Call(nil)[0]
+		} else if srcFieldIdx > -1 {
+			srcField = src.Field(srcFieldIdx)
+		} else {
+			continue
+		}
+		if setFn != "" && dstFieldType.Type != srcField.Type() {
+			dst.Addr().MethodByName(setFn).Call([]reflect.Value{srcField})
+		} else {
+			dstField := dst.Field(i)
+			if err = copyValue(dstField, srcField); err != nil {
+				return
+			}
 		}
 	}
 	return
