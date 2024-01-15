@@ -1,6 +1,7 @@
 package copier
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 )
@@ -12,14 +13,15 @@ const (
 )
 
 func copyStruct(dst reflect.Value, src reflect.Value) (err error) {
-	if src.Type().AssignableTo(dst.Type()) {
-		dst.Set(src)
-		return
-	}
 	if src.Kind() == reflect.Ptr {
 		src = src.Elem()
 	}
 	dstType := dst.Type()
+	// assignable
+	if src.Type().AssignableTo(dstType) {
+		dst.Set(src)
+		return
+	}
 	// time
 	if dstType.ConvertibleTo(timeType) {
 		err = copyTime(dst, src)
@@ -45,6 +47,10 @@ func copyStruct(dst reflect.Value, src reflect.Value) (err error) {
 		}
 	}
 	srcType := src.Type()
+	if srcType.Kind() != reflect.Struct {
+		err = errors.New("dst is struct but src is not struct")
+		return
+	}
 	// fields
 	srcFieldNum := srcType.NumField()
 	if srcFieldNum == 0 {

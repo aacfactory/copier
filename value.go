@@ -55,6 +55,24 @@ func copyValue(dst reflect.Value, src reflect.Value) (err error) {
 		}
 		err = copyMap(dst, src)
 		break
+	case reflect.Interface:
+		if dst.CanSet() {
+			if src.Type().Implements(dst.Type()) {
+				dst.Set(src)
+				break
+			}
+			if src.Type().Kind() == reflect.Struct {
+				srcPtrType := reflect.PtrTo(src.Type())
+				if srcPtrType.Implements(dst.Type()) {
+					srcPtr := reflect.New(src.Type())
+					srcPtr.Elem().Set(src)
+					dst.Set(srcPtr)
+					break
+				}
+			}
+			err = fmt.Errorf("copier: interface %s is not support", dst.Type().String())
+		}
+		break
 	default:
 		err = fmt.Errorf("copier: %s is not support", dst.Type().String())
 		return

@@ -9,6 +9,7 @@ copy source value into destination value.
 * Support map
 * Support getter or setter
 * support type convert
+* support interface
 
 ## Note
 * DON'T SUPPORT UNEXPORTED EMBED PTR 

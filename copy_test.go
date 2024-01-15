@@ -22,6 +22,7 @@ type Foo struct {
 	Time   time.Time
 	Slice  []FooElem
 	Map    map[string]FooElem
+	Entry  Entry
 }
 
 type BarElem struct {
@@ -40,6 +41,7 @@ type Bar struct {
 	Time   time.Time
 	Slice  []BarElem
 	Map    map[int]BarElem
+	Entry  EntryImpl
 }
 
 func TestCopy(t *testing.T) {
@@ -55,6 +57,7 @@ func TestCopy(t *testing.T) {
 		Time:   time.Now(),
 		Slice:  []BarElem{{String: "1", Int64: 1}, {String: "2", Int64: 2}},
 		Map:    map[int]BarElem{1: {String: "1", Int64: 1}, 2: {String: "2", Int64: 2}},
+		Entry:  EntryImpl{s: "entry"},
 	}
 	err := copier.Copy(&foo, bar)
 	if err != nil {

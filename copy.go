@@ -25,10 +25,16 @@ func Copy(dst any, src any) (err error) {
 }
 
 func ValueOf[E any](src any) (dst E, err error) {
-	p := new(E)
-	if err = Copy(p, src); err != nil {
+	matched := false
+	if dst, matched = src.(E); matched {
 		return
 	}
-	dst = *p
+	dst = *new(E)
+	dstType := reflect.TypeOf(dst)
+	if dstType.Kind() == reflect.Ptr {
+		err = Copy(dst, src)
+	} else {
+		err = Copy(&dst, src)
+	}
 	return
 }
